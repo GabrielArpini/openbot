@@ -1,3 +1,4 @@
+import { decodeSkillModeState, parseSetSkillMode, parseSkillModeTarget } from "@openbot/contracts/ipc-skill-mode";
 import { AGENT_COLORS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-colors-v1";
 import {
   AGENT_FAST_MODE_CAPABILITY,
@@ -28,6 +29,7 @@ import {
   SIDEBAR_FOLDERS_ROUTES,
 } from "@openbot/contracts/team-protocol/sidebar-folders-v1";
 import { SIDEBAR_PINS_CAPABILITY, SIDEBAR_PINS_ROUTES } from "@openbot/contracts/team-protocol/sidebar-pins-v1";
+import { SKILL_MODES_CAPABILITY, SKILL_MODES_ROUTES } from "@openbot/contracts/team-protocol/skill-modes-v1";
 // An agent's core surface: status, agents, conversations, the queue and the prompts
 // a turn can raise. Memories, routines and attachments are their own registrars.
 // Every one of these routes to the local service or to a remote server by the
@@ -613,6 +615,32 @@ export function agentIpcHandlers({
               { concurrency: "unbounded" },
             ).pipe(Effect.map(([agents]) => remoteServers.withAgentColors(serverId, agents))),
           ),
+      }),
+      readSkillMode: scopedHandler(parseSkillModeTarget, {
+        local: (input) => service.readSkillMode(input),
+        remote: (input, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, SKILL_MODES_CAPABILITY))
+            throw new Error(sourceText("error.team.agentSettingsUnsupported"));
+          return runCauseEffect(
+            remoteServers.request(serverId, SKILL_MODES_ROUTES.read, decodeSkillModeState, {
+              method: "POST",
+              body: input,
+            }),
+          );
+        },
+      }),
+      setSkillMode: scopedHandler(parseSetSkillMode, {
+        local: (input) => runCauseEffect(service.setSkillMode(input)),
+        remote: (input, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, SKILL_MODES_CAPABILITY))
+            throw new Error(sourceText("error.team.agentSettingsUnsupported"));
+          return runCauseEffect(
+            remoteServers.request(serverId, SKILL_MODES_ROUTES.set, decodeSkillModeState, {
+              method: "POST",
+              body: input,
+            }),
+          );
+        },
       }),
       listInstalledSkills: scopedHandler(parseAgentId, {
         local: (agentId) => runCauseEffect(skills.listInstalledForChatTags(agentId)),

@@ -1,6 +1,16 @@
 import { defineMessages } from "../../../message";
 
 export const messages = defineMessages("error.skill", {
+  "error.skill.mode.bundle": "Invalid skill bundle entry: {path}.",
+  "error.skill.mode.chatGone": "Skill mode chat is unavailable.",
+  "error.skill.mode.changed":
+    "The selected skill changed. Select its new revision or turn off the skill mode before continuing.",
+  "error.skill.mode.unavailable": "Skill modes are unavailable on this host.",
+  "error.skill.mode.size": "A skill mode must contain between 1 and 32000 characters. Its body was not truncated.",
+  "error.skill.mode.invalid":
+    "The selected skill is missing, disabled, invalid or modified. Restore it or select another skill.",
+  "error.skill.mode.outside": "Skill mode file is outside its skill root.",
+  "error.skill.mode.frontmatter": "Skill mode frontmatter is invalid.",
   // Skill package, library, and marketplace errors.
   "error.skill.symlinks": "Skill packages cannot contain symbolic links.",
   "error.skill.expandedTooLarge": "The expanded skill must be under 10 MB.",

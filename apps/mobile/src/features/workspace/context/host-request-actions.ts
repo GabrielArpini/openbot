@@ -40,6 +40,7 @@ import {
   withFastServiceTiers,
   withWhatsAppWorkingMessages,
 } from "@openbot/contracts/ipc";
+import { decodeSkillModeState } from "@openbot/contracts/ipc-skill-mode";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { AGENT_ACCESS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-access-v1";
@@ -166,6 +167,7 @@ import { SERVER_AUDIT_CAPABILITY } from "@openbot/contracts/team-protocol/server
 import { SHARED_TABLES_CAPABILITY } from "@openbot/contracts/team-protocol/shared-tables-v1";
 import { SIGN_IN_RELAY_CAPABILITY } from "@openbot/contracts/team-protocol/sign-in-relay-v1";
 import { SKILL_LEARNING_CAPABILITY } from "@openbot/contracts/team-protocol/skill-learning-v1";
+import { SKILL_MODES_CAPABILITY, SKILL_MODES_ROUTES } from "@openbot/contracts/team-protocol/skill-modes-v1";
 import { SKILLS_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/skills-admin-v1";
 import { STORAGE_DISK_CAPABILITY, STORAGE_DISK_ROUTES } from "@openbot/contracts/team-protocol/storage-disk-v1";
 import {
@@ -467,6 +469,8 @@ type HostRequestActions = Pick<
   | "startLiveVoice"
   | "stopLiveVoice"
   | "compactContext"
+  | "readSkillMode"
+  | "setSkillMode"
   | "loadAgentSessionSettings"
   | "loadAgentFolders"
   | "addAgentFolder"
@@ -1063,6 +1067,20 @@ export function createHostRequestActions({
       ),
     loadMcpAccess: async (serverId) => runTeamRequest(getHostMcpAccess(mcpAccessAdmin(serverId))),
     setMcpAccess: async (input, serverId) => runTeamRequest(setHostMcpAccess(mcpAccessAdmin(serverId), input)),
+    readSkillMode: (input, serverId) =>
+      capabilityApi(serverId, SKILL_MODES_CAPABILITY, "mobile.chat.skillMode.unavailable")(
+        "POST",
+        SKILL_MODES_ROUTES.read,
+        decodeSkillModeState,
+        { ...input },
+      ),
+    setSkillMode: (input, serverId) =>
+      capabilityApi(serverId, SKILL_MODES_CAPABILITY, "mobile.chat.skillMode.unavailable")(
+        "POST",
+        SKILL_MODES_ROUTES.set,
+        decodeSkillModeState,
+        { ...input },
+      ),
     loadAgentSessionSettings: async (agentId, serverId) =>
       has(serverId, AGENT_SESSION_SETTINGS_CAPABILITY)
         ? runTeamRequest(readAgentSessionSettings(sessionSettingsAdmin(serverId), agentId))

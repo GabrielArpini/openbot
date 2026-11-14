@@ -31,6 +31,8 @@ export interface ConversationRuntime {
     | "importAttachmentData"
     | "downloadAttachments"
     | "editQueuedMessage"
+    | "readSkillMode"
+    | "setSkillMode"
     | "listInstalledSkills"
     | "listMcpServers"
     | "listWorkspaceDirectory"
@@ -49,6 +51,7 @@ export interface ConversationRuntime {
     Partial<Pick<OpenBotDesktopApi["agent"], "stopAttachmentDownload" | "onAttachmentDownload">> &
     // Retry and remove of a failed file import. Absent, a failed upload chip has only its remove button.
     Partial<Pick<OpenBotDesktopApi["agent"], "retryAttachmentImport" | "discardAttachmentImport">>;
+  onSkillModeChanged?: (listener: (threadId: string) => void) => () => void;
   browser: Pick<
     OpenBotDesktopApi["browser"],
     | "capturePreview"

@@ -7,7 +7,7 @@ import { join } from "node:path";
 import { createInterface } from "node:readline";
 import { isDynamicRecord, type DynamicRecord as RpcRecord } from "@openbot/contracts/runtime-values";
 
-const sessionFile = join(process.env.FAKE_DIR ?? process.cwd(), `pi-${process.pid}.jsonl`);
+let sessionFile = join(process.env.FAKE_DIR ?? process.cwd(), `pi-${process.pid}.jsonl`);
 
 function log(entry: RpcRecord): void {
   const path = process.env.FAKE_LOG;
@@ -43,10 +43,17 @@ log({ event: "argv", commandLine: argv.join(" "), promptIsFile, promptLength });
 
 const handlers: Record<string, (command: RpcRecord) => void> = {
   get_state: (command) => answer(command, { sessionFile, isStreaming: false, isCompacting: false }),
-  switch_session: (command) => answer(command, { cancelled: false }),
+  switch_session: (command) => {
+    sessionFile = String(command.sessionPath);
+    answer(command, { cancelled: false });
+  },
   prompt: (command) => {
     log({ event: "prompt", text: String(command.message) });
     answer(command, { disposition: "started" });
+    if (String(command.message).includes("mode-first")) {
+      write({ type: "compaction_start" });
+      write({ type: "compaction_end" });
+    }
     write({
       type: "message_end",
       message: { role: "assistant", content: [{ type: "text", text: "long instructions ok" }], stopReason: "stop" },

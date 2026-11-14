@@ -2168,6 +2168,7 @@ export async function createApplicationServices({
   /** The plan storage of a hosted server, set after its sign-in. The agent instructions name it. */
   let hostedStorageGb: number | null = null;
   const service: AgentService = new AgentService({
+    skillModeSource: (agentId, skillId) => skills.readModeSource(agentId, skillId),
     store,
     mailbox,
     browser,
@@ -3445,6 +3446,7 @@ export async function createApplicationServices({
       agentDefaults: agentDefaultsSettings,
       folders: agentFolders,
       instructions: agentInstructions,
+      skillModes: service,
       sessionSettings: service,
       acpRegistry,
       customAgents: customAgentChanges,

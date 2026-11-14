@@ -24,6 +24,7 @@ import { latestVisibleAgentMessageId } from "./conversation-read-state";
 import { useConversationViewScope } from "./conversation-scope";
 import type { ConversationThreads } from "./conversation-types";
 import { useThreadMcpSignInCard } from "./McpSignInChatCard";
+import { ConversationSkillMode } from "./SkillModeControl";
 import { createTurnSteps } from "./turn-steps";
 
 /** The open side thread of the agent, in the place of the agent's own chat and its message box. */
@@ -262,6 +263,18 @@ export function ConversationThread() {
             />
           </Show>
           <AgentThreadView
+            modeControl={
+              <ConversationSkillMode
+                target={
+                  props.threads?.conversation?.threadId
+                    ? { agentId: current().agent.id, threadId: props.threads.conversation.threadId }
+                    : null
+                }
+                skills={installedSkills()}
+                server={props.server}
+                runtime={props.runtime}
+              />
+            }
             scrollRef={setThreadScrollElement}
             showFullMessage={(message) =>
               threadSearchOpen() && chatSearchOpensMessage(message.body, threadSearchQuery())

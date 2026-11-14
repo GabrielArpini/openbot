@@ -10,6 +10,7 @@ import assert from "node:assert/strict";
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { Effect } from "effect";
 import type { AgentClient } from "../src/backend/agent-client";
 import { requireProviderDriver } from "../src/backend/provider-drivers";
 import { readJsonl, runTurn, startThread, stopClients } from "./provider-fakes/host";
@@ -37,6 +38,7 @@ interface Report {
     instructionsArrived: boolean;
   };
   withoutInstructions?: { reply: string; status: string | null; promptArgument: boolean };
+  skillMode?: { initial: boolean; later: boolean; reconstructed: boolean; removed: boolean };
   failure?: string;
 }
 
@@ -127,6 +129,35 @@ try {
     status: plainTurn.status,
     promptArgument: (last.promptLength ?? 0) > 0,
   };
+
+  const modeText = "FULL_PI_MODE_SENTINEL";
+  const modeThread = await startThread(client, {
+    cwd: root,
+    developerInstructions: modeText,
+    skillModeInstructions: modeText,
+  });
+  await runTurn(client, modeThread, { text: "mode-first" });
+  let modeLog = await readJsonl<LogEntry>(join(root, "agent.jsonl"));
+  assert.ok(modeLog.findLast((row) => row.event === "prompt")?.text?.includes(modeText));
+  await runTurn(client, modeThread, { text: "mode-second" });
+  modeLog = await readJsonl<LogEntry>(join(root, "agent.jsonl"));
+  assert.ok(modeLog.findLast((row) => row.event === "prompt")?.text?.includes(modeText));
+  await client.releaseThread?.(modeThread).pipe(Effect.runPromise);
+  await Effect.runPromise(
+    client.request(
+      "thread/resume",
+      { threadId: modeThread, cwd: root, developerInstructions: modeText, skillModeInstructions: modeText },
+      (value) => value,
+    ),
+  );
+  await runTurn(client, modeThread, { text: "mode-resumed" });
+  modeLog = await readJsonl<LogEntry>(join(root, "agent.jsonl"));
+  assert.ok(modeLog.findLast((row) => row.event === "prompt")?.text?.includes(modeText));
+  const offThread = await startThread(client, { cwd: root, skillModeInstructions: "" });
+  await runTurn(client, offThread, { text: "mode-off" });
+  modeLog = await readJsonl<LogEntry>(join(root, "agent.jsonl"));
+  assert.ok(!modeLog.findLast((row) => row.event === "prompt")?.text?.includes(modeText));
+  report.skillMode = { initial: true, later: true, reconstructed: true, removed: true };
 
   report.passed = true;
 } catch (error) {

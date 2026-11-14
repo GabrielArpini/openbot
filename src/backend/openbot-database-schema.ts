@@ -21,6 +21,7 @@ import { AGENT_SKILL_LOADS_SCHEMA_SQL } from "./database/agent-skill-loads-schem
 import { DELETED_THREAD_MESSAGES_SCHEMA_SQL } from "./database/deleted-thread-messages-schema";
 import { PINNED_THREAD_MESSAGES_SCHEMA_SQL } from "./database/pinned-thread-messages-schema";
 import { PROVIDER_HISTORY_SCHEMA_SQL } from "./database/provider-history-schema";
+import { THREAD_SKILL_MODES_SCHEMA_SQL } from "./database/thread-skill-modes-schema";
 import { MCP_SERVERS_SCHEMA_SQL } from "./mcp-schema";
 import {
   MESSAGING_ALLOWED_ROLES_SCHEMA_SQL,
@@ -654,7 +655,8 @@ const LATEST_SCHEMA_SQL =
   AGENT_SKILL_LOADS_SCHEMA_SQL +
   MESSAGING_PINGS_SCHEMA_SQL +
   V60_AGENT_MEMORY_SITE_INDEX_SQL +
-  PINNED_THREAD_MESSAGES_SCHEMA_SQL;
+  PINNED_THREAD_MESSAGES_SCHEMA_SQL +
+  THREAD_SKILL_MODES_SCHEMA_SQL;
 
 /** The end of the thread message table with the migration 40 columns before its PRIMARY KEY constraint. */
 function withThreadMessageOrderColumns(tableEnd: string): string {
@@ -1029,6 +1031,7 @@ const MIGRATIONS: readonly OpenBotMigration[] = [
     // so the table starts empty and every thread shows its messages as before.
     up: (db) => db.exec(PINNED_THREAD_MESSAGES_SCHEMA_SQL),
   },
+  { version: 62, up: (db) => db.exec(THREAD_SKILL_MODES_SCHEMA_SQL) },
 ];
 
 const LATEST_SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1]?.version ?? BASELINE_SCHEMA_VERSION;

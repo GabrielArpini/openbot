@@ -166,6 +166,7 @@ export interface ChatViewProps {
   channelTurnSummaries?: ReadonlyMap<string, TurnStepsSummary>;
   /** Rows under the agent's activity, such as the tasks that the agent works on. */
   activityAccessory?: ReactNode;
+  modeControl?: ReactNode;
   /** The agent's threads, in the menu of the agent's name in the header. */
   threadMenu?: ChatThreadMenu;
   /** This chat's thread. Browser requests of the agent's other threads, such as its tasks, do not show here. */
@@ -285,6 +286,7 @@ export function ChatView({
   channelTurnSummaries,
   activityAccessory,
   threadMenu,
+  modeControl,
   threadId = null,
   channelThreadIds = null,
   approvals,
@@ -1435,52 +1437,55 @@ export function ChatView({
                   actionForeground={actionForeground}
                 />
               ) : (
-                <ChatComposer
-                  sendRetryVersion={sendRetryVersion}
-                  replyTarget={replyTarget}
-                  replyFocusVersion={replyFocusVersion}
-                  focusVersion={answerFocusVersion}
-                  handoffFocusVersion={handoffFocusVersion}
-                  onCancelReply={cancelReply}
-                  mentionAgents={mentionAgents}
-                  mentionSkills={mentionSkills}
-                  mentionReferences={mentionReferences}
-                  skillPickerVersion={skillPickerVersion}
-                  onSuggestionsVisibleChange={setSuggestionsOpen}
-                  key={target.id}
-                  action={action}
-                  actionForeground={actionForeground}
-                  agentName={target.name}
-                  placeholder={
-                    answersQuestion
-                      ? t("mobile.chat.question.answerPlaceholder")
-                      : selection
-                        ? t("mobile.chat.selection.describe")
-                        : undefined
-                  }
-                  bottomInset={insets.bottom}
-                  disabled={!canSend}
-                  attachments={attachments}
-                  draft={draft}
-                  fallbackBackground={fieldBackground}
-                  foreground={foreground}
-                  liquidGlassAvailable={liquidGlassAvailable}
-                  muted={muted}
-                  raised={raised}
-                  onChangeDraft={setDraft}
-                  onSend={send}
-                  onStop={requestStop}
-                  keyboardProgress={motion.keyboardProgress}
-                  menuOpen={attachments.menuOpen}
-                  menuProgress={menuProgress}
-                  stopping={stopping}
-                  voice={composerVoice}
-                  dictation={dictation}
-                  // An agent's own colour; a channel keeps the default controls.
-                  voiceAccent={target.kind === "agent" ? accent : undefined}
-                  voicePalette={palette}
-                  voiceAvatar={voiceAvatar}
-                />
+                <>
+                  {modeControl}
+                  <ChatComposer
+                    sendRetryVersion={sendRetryVersion}
+                    replyTarget={replyTarget}
+                    replyFocusVersion={replyFocusVersion}
+                    focusVersion={answerFocusVersion}
+                    handoffFocusVersion={handoffFocusVersion}
+                    onCancelReply={cancelReply}
+                    mentionAgents={mentionAgents}
+                    mentionSkills={mentionSkills}
+                    mentionReferences={mentionReferences}
+                    skillPickerVersion={skillPickerVersion}
+                    onSuggestionsVisibleChange={setSuggestionsOpen}
+                    key={target.id}
+                    action={action}
+                    actionForeground={actionForeground}
+                    agentName={target.name}
+                    placeholder={
+                      answersQuestion
+                        ? t("mobile.chat.question.answerPlaceholder")
+                        : selection
+                          ? t("mobile.chat.selection.describe")
+                          : undefined
+                    }
+                    bottomInset={insets.bottom}
+                    disabled={!canSend}
+                    attachments={attachments}
+                    draft={draft}
+                    fallbackBackground={fieldBackground}
+                    foreground={foreground}
+                    liquidGlassAvailable={liquidGlassAvailable}
+                    muted={muted}
+                    raised={raised}
+                    onChangeDraft={setDraft}
+                    onSend={send}
+                    onStop={requestStop}
+                    keyboardProgress={motion.keyboardProgress}
+                    menuOpen={attachments.menuOpen}
+                    menuProgress={menuProgress}
+                    stopping={stopping}
+                    voice={composerVoice}
+                    dictation={dictation}
+                    // An agent's own colour; a channel keeps the default controls.
+                    voiceAccent={target.kind === "agent" ? accent : undefined}
+                    voicePalette={palette}
+                    voiceAvatar={voiceAvatar}
+                  />
+                </>
               )}
             </Animated.View>
           </KeyboardGestureArea>

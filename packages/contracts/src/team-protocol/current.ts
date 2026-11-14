@@ -161,6 +161,7 @@ import { SIDEBAR_FOLDERS_CAPABILITY } from "./sidebar-folders-v1";
 import { SIDEBAR_PINS_CAPABILITY } from "./sidebar-pins-v1";
 import { SIGN_IN_RELAY_CAPABILITY } from "./sign-in-relay-v1";
 import { SKILL_LEARNING_CAPABILITY } from "./skill-learning-v1";
+import { SKILL_MODES_CAPABILITY } from "./skill-modes-v1";
 import { SKILLS_ADMIN_CAPABILITY } from "./skills-admin-v1";
 import { SKILLS_EVENTS_CAPABILITY } from "./skills-events-v1";
 import { STORAGE_CHANNEL_CAPABILITY } from "./storage-channel-v1";
@@ -387,6 +388,7 @@ export {
   SIDEBAR_PINS_CAPABILITY,
   SIGN_IN_RELAY_CAPABILITY,
   SKILL_LEARNING_CAPABILITY,
+  SKILL_MODES_CAPABILITY,
   SKILLS_ADMIN_CAPABILITY,
   SKILLS_EVENTS_CAPABILITY,
   STORAGE_CAPABILITY,
@@ -464,6 +466,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   STORAGE_CAPABILITY,
   AGENT_ADMIN_CAPABILITY,
   AGENT_MEMORIES_CAPABILITY,
+  SKILL_MODES_CAPABILITY,
   AGENT_SESSION_SETTINGS_CAPABILITY,
   ACP_REGISTRY_CAPABILITY,
   SKILLS_ADMIN_CAPABILITY,
@@ -891,6 +894,7 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
  * leaves these out of the compatibility list of an older peer (`teamCapabilitiesVisibleToProtocol`).
  */
 export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<TeamCurrentCapability>([
+  SKILL_MODES_CAPABILITY,
   TEAM_LONG_CAPABILITY_LISTS_CAPABILITY,
   AGENT_NOTIFICATION_LEVELS_CAPABILITY,
   AGENT_NEW_CHAT_CAPABILITY,

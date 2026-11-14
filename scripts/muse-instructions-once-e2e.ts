@@ -114,10 +114,11 @@ try {
     client.start();
     return client;
   };
-  const params = (developerInstructions: string) => ({
+  const params = (developerInstructions: string, withMode = true) => ({
     cwd: workspace,
     runtimeWorkspaceRoots: [workspace],
     developerInstructions,
+    skillModeInstructions: withMode ? "<openbot_skill_mode>\nMUSE_FULL_MODE\n</openbot_skill_mode>" : "",
   });
 
   let client = open();
@@ -148,7 +149,11 @@ try {
   assert.equal(report.steps.find((step) => step.text === "fail-now")?.status, "failed", "The failing turn fails.");
   assert.deepEqual(
     report.prompts.map((prompt) => prompt.texts),
-    report.steps.map((step) => (step.instructions ? [step.instructions, step.text] : [step.text])),
+    report.steps.map((step) => [
+      ...(step.instructions ? [step.instructions] : []),
+      "<openbot_skill_mode>\nMUSE_FULL_MODE\n</openbot_skill_mode>",
+      step.text,
+    ]),
     "The instructions come only when the session lacks them.",
   );
 
@@ -170,14 +175,14 @@ try {
     storedCount: 7,
     limit: 20,
   };
-  const memoryThread = await startThread(memoryClient, { ...params(INSTRUCTIONS), memoryContext: first });
+  const memoryThread = await startThread(memoryClient, { ...params(INSTRUCTIONS, false), memoryContext: first });
   const memoryTurn = (text: string) => runTurn(memoryClient, memoryThread, { text, timeoutMs: 15_000 });
   await memoryTurn("one");
   await memoryTurn("two");
   await runCauseEffect(
     memoryClient.request(
       "thread/resume",
-      { threadId: memoryThread, ...params(INSTRUCTIONS), memoryContext: edited },
+      { threadId: memoryThread, ...params(INSTRUCTIONS, false), memoryContext: edited },
       (v) => v,
     ),
   );

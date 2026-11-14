@@ -22,6 +22,7 @@ import {
  * already holds the blocks it was sent.
  */
 export class TurnContext {
+  readonly #skillModes = new Map<string, string>();
   /** The latest memories that OpenBot gave, and the last that a turn sent. */
   readonly #memories = new Map<string, { current: MemoryContext; delivered: MemoryContext | null }>();
   /** The same for the section-mates. `undefined` as `delivered`: the context can hold any earlier list. */
@@ -41,6 +42,8 @@ export class TurnContext {
 
   /** Takes the context from the params of a thread start or resume. */
   set(threadId: string, params: unknown, resume: boolean): void {
+    if (isDynamicRecord(params) && typeof params.skillModeInstructions === "string")
+      this.#skillModes.set(threadId, params.skillModeInstructions);
     if (isDynamicRecord(params) && params.turnStyleReminder === true) this.#styleReminders.add(threadId);
     else this.#styleReminders.delete(threadId);
     const current = readMemoryContext(params);
@@ -83,6 +86,7 @@ export class TurnContext {
     const blocks = command
       ? []
       : [
+          this.#skillModes.get(threadId) || null,
           memory ? memoryContextUpdate(memory.delivered, memory.current) : null,
           teammates ? sectionTeammatesUpdate(teammates.delivered, teammates.current) : null,
           file ? instructionsFileUpdate(file.delivered, file.current) : null,
@@ -112,6 +116,7 @@ export class TurnContext {
   }
 
   forget(threadId: string): void {
+    this.#skillModes.delete(threadId);
     this.#memories.delete(threadId);
     this.#teammates.delete(threadId);
     this.#instructionsFiles.delete(threadId);

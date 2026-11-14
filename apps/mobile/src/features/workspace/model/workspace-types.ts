@@ -194,6 +194,7 @@ import type {
   SaveEventRoutineResult,
   WebhookSecret,
 } from "@openbot/contracts/ipc-events";
+import type { SetSkillModeInput, SkillModeState, SkillModeTarget } from "@openbot/contracts/ipc-skill-mode";
 import type { LiveVoiceSessionResponse, LiveVoiceStartRequest } from "@openbot/contracts/team-protocol/live-voice-v1";
 import type { QueueEditRequest } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import type { RemoteConnectionFailure, RemoteRecoveryStatus, RemoteTeamDirectoryClient } from "@openbot/team-client";
@@ -1015,6 +1016,9 @@ export interface MobileWorkspaceContextValue {
    */
   canChooseNewAgentModel: (serverId: string) => boolean;
   /** The agent forgets the messages before it. The host refuses while the agent works. */
+  canUseSkillModes: (serverId: string) => boolean;
+  readSkillMode: (input: SkillModeTarget, serverId: string) => Promise<SkillModeState>;
+  setSkillMode: (input: SetSkillModeInput, serverId: string) => Promise<SkillModeState>;
   loadAgentSessionSettings: (agentId: string, serverId: string) => Promise<AgentSessionSettings | null>;
   setAgentSessionSetting: (input: SetAgentSessionSettingInput, serverId: string) => Promise<AgentSessionSettings>;
   resetAgentSessionSetting: (input: ResetAgentSessionSettingInput, serverId: string) => Promise<AgentSessionSettings>;
@@ -1318,6 +1322,7 @@ type ServerCheckKey =
   | "canManageRoutineResults"
   | "canManageAgentSkills"
   | "canManageSharedTables"
+  | "canUseSkillModes"
   | "canManageAgentFolders"
   | "canNestSidebarFolders"
   | "canManageAgentAccess"

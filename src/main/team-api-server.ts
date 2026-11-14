@@ -219,6 +219,7 @@ import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes
 import { SIDEBAR_FOLDERS_CAPABILITY, sidebarFoldersEvent } from "@openbot/contracts/team-protocol/sidebar-folders-v1";
 import { SIDEBAR_PINS_CAPABILITY } from "@openbot/contracts/team-protocol/sidebar-pins-v1";
 import { withSkillSuggestionNames } from "@openbot/contracts/team-protocol/skill-learning-v1";
+import { SKILL_MODES_CAPABILITY } from "@openbot/contracts/team-protocol/skill-modes-v1";
 import { STORAGE_CHANNEL_CAPABILITY } from "@openbot/contracts/team-protocol/storage-channel-v1";
 import { STORAGE_DISK_CAPABILITY } from "@openbot/contracts/team-protocol/storage-disk-v1";
 import { STORAGE_USER_FILES_CAPABILITY } from "@openbot/contracts/team-protocol/storage-user-files-v1";
@@ -408,6 +409,7 @@ import { routeSidebarFolders } from "./team-api/route-sidebar-folders";
 import { routeSidebarPins } from "./team-api/route-sidebar-pins";
 import { routeSignInRelay } from "./team-api/route-sign-in-relay";
 import { routeSkillLearning } from "./team-api/route-skill-learning";
+import { routeSkillModes } from "./team-api/route-skill-modes";
 import { routeSkillSuggestionSave } from "./team-api/route-skill-suggestion-save";
 import { routeSkillsAdmin } from "./team-api/route-skills-admin";
 import { routeStorage } from "./team-api/route-storage";
@@ -1223,6 +1225,7 @@ export class TeamApiServer {
         return;
       if ((await routeRoutinesOnce(context, this.#options.agents, this.#options.channels, hidden)) === "handled")
         return;
+      if ((await routeSkillModes(context, this.#options.admin, hidden)) === "handled") return;
       if ((await routeAgentSessionSettings(context, this.#options.admin, hidden)) === "handled") return;
       if ((await routeAgentFolders(context, this.#options.admin, hidden)) === "handled") return;
       if ((await routeAgentInstructions(context, this.#options.admin, hidden)) === "handled") return;
@@ -2637,6 +2640,7 @@ export class TeamApiServer {
             return this.#options.browserProfiles !== undefined;
           // The host reads the egress channel of each desktop peer, and only a profile proxy uses it.
           if (capability === BROWSER_EGRESS_CAPABILITY) return this.#options.browserProfiles !== undefined;
+          if (capability === SKILL_MODES_CAPABILITY) return this.#options.admin?.skillModes !== undefined;
           if (capability === SKILLS_ADMIN_CAPABILITY) return this.#options.admin?.skills !== undefined;
           if (capability === GITHUB_SKILLS_CAPABILITY) return this.#options.admin?.skills !== undefined;
           if (capability === SKILLS_EVENTS_CAPABILITY) return this.#options.skills !== undefined;
@@ -2868,6 +2872,7 @@ function eventCapability(event: AgentEvent): TeamCurrentCapability | null {
     event.type === "channel-routines-changed"
   )
     return "channel-chats-v1";
+  if (event.type === "skill-mode-changed") return SKILL_MODES_CAPABILITY;
   if (event.type === "agent-session-settings-changed") return AGENT_SESSION_SETTINGS_CAPABILITY;
   if (event.type === "message-pins-changed") return MESSAGE_PINS_CAPABILITY;
   if (event.type === "hidden-agents-changed") return AGENT_HIDDEN_CAPABILITY;
