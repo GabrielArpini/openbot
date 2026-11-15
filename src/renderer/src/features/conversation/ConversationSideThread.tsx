@@ -20,6 +20,7 @@ import { latestVisibleAgentMessageId } from "./conversation-read-state";
 import { useConversationViewScope } from "./conversation-scope";
 import type { SideThread } from "./conversation-types";
 import { useThreadMcpSignInCard } from "./McpSignInChatCard";
+import { ConversationSkillMode } from "./SkillModeControl";
 import { createTurnSteps } from "./turn-steps";
 
 /**
@@ -177,6 +178,14 @@ export function ConversationSideThread(props: { threadId: string }) {
       <Show when={shown()}>
         {(current) => (
           <AgentThreadView
+            modeControl={
+              <ConversationSkillMode
+                target={{ agentId: current().agent.id, threadId: props.threadId }}
+                skills={installedSkills()}
+                server={view.server}
+                runtime={view.runtime}
+              />
+            }
             task={current().thread.task}
             limit={view.threads?.limit ?? 1}
             agent={current().agent}

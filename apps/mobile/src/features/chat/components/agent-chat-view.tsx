@@ -31,6 +31,7 @@ import { useAgentMentionSkills } from "../model/use-agent-mention-skills";
 import { useProgressUpdates } from "../model/use-progress-updates";
 import { MAIN_THREAD_ID, useChatThreadMenu } from "./chat-thread-menu";
 import { ChatView } from "./chat-view";
+import { SkillModeControl } from "./skill-mode-control";
 import { useBranchThread } from "./use-branch-thread";
 import { useChatQueue } from "./use-chat-queue";
 import { useMessageDelete } from "./use-message-delete";
@@ -445,6 +446,16 @@ export function MobileChatView({
       questionForm={questionForm}
       activityAccessory={activityAccessory}
       threadMenu={threadMenu}
+      modeControl={
+        threadId ? (
+          <SkillModeControl
+            key={`${agent.serverId}:${threadId}`}
+            agentId={agent.id}
+            serverId={agent.serverId}
+            threadId={threadId}
+          />
+        ) : undefined
+      }
       threadId={threadId}
       approvals={approvals}
       readBoundary={latest ? `${latest.id}:${latest.status}` : null}

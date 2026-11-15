@@ -28,6 +28,7 @@ import { ChatMessageList } from "@/features/chat/components/chat-message-list";
 import { DRAFT_THREAD_ID, useChatThreadMenu } from "@/features/chat/components/chat-thread-menu";
 import { useRowsAfterOpenTransition } from "@/features/chat/components/chat-view";
 import { dictationVoice } from "@/features/chat/components/composer-voice";
+import { SkillModeControl } from "@/features/chat/components/skill-mode-control";
 import { useMarkThreadRead } from "@/features/chat/components/use-agent-thread-reads";
 import { useBranchThread } from "@/features/chat/components/use-branch-thread";
 import { useChatAttachments } from "@/features/chat/components/use-chat-attachments";
@@ -750,46 +751,58 @@ function AgentTaskChat({
               actionForeground={actionForeground}
             />
           ) : (
-            <ChatComposer
-              sendRetryVersion={0}
-              replyTarget={null}
-              replyFocusVersion={0}
-              onCancelReply={() => {}}
-              mentionAgents={serverAgents.filter((item) => item.id !== agentId)}
-              mentionReferences={mentionReferences}
-              action={action}
-              actionForeground={actionForeground}
-              agentName={target.name}
-              placeholder={
-                answersQuestion
-                  ? t("mobile.chat.question.answerPlaceholder")
-                  : isDraft
-                    ? t("mobile.chat.threads.draftPlaceholder", { name: target.name })
-                    : t(
-                        task?.state === "running" || task?.state === "queued"
-                          ? "mobile.server.threads.messagePlaceholder"
-                          : "mobile.server.threads.continuePlaceholder",
-                      )
-              }
-              bottomInset={insets.bottom}
-              disabled={!canSend || (sending && (isDraft || attachments.items.length > 0))}
-              attachments={filesAllowed ? attachments : undefined}
-              menuOpen={attachments.menuOpen}
-              menuProgress={menuProgress}
-              draft={draft}
-              fallbackBackground={fieldBackground}
-              foreground={foreground}
-              liquidGlassAvailable={liquidGlassAvailable}
-              muted={muted}
-              raised={raised}
-              onChangeDraft={setDraft}
-              onSend={(text) => void send(text)}
-              onStop={task?.state === "running" && !answersQuestion ? () => threadActions.run(task, "stop") : undefined}
-              stopping={task ? threadActions.acting(task) : false}
-              keyboardProgress={motion.keyboardProgress}
-              voice={dictationVoice(voice, t)}
-              voiceAccent={accent}
-            />
+            <>
+              {threadId ? (
+                <SkillModeControl
+                  key={`${serverId}:${threadId}`}
+                  agentId={agentId}
+                  serverId={serverId}
+                  threadId={threadId}
+                />
+              ) : null}
+              <ChatComposer
+                sendRetryVersion={0}
+                replyTarget={null}
+                replyFocusVersion={0}
+                onCancelReply={() => {}}
+                mentionAgents={serverAgents.filter((item) => item.id !== agentId)}
+                mentionReferences={mentionReferences}
+                action={action}
+                actionForeground={actionForeground}
+                agentName={target.name}
+                placeholder={
+                  answersQuestion
+                    ? t("mobile.chat.question.answerPlaceholder")
+                    : isDraft
+                      ? t("mobile.chat.threads.draftPlaceholder", { name: target.name })
+                      : t(
+                          task?.state === "running" || task?.state === "queued"
+                            ? "mobile.server.threads.messagePlaceholder"
+                            : "mobile.server.threads.continuePlaceholder",
+                        )
+                }
+                bottomInset={insets.bottom}
+                disabled={!canSend || (sending && (isDraft || attachments.items.length > 0))}
+                attachments={filesAllowed ? attachments : undefined}
+                menuOpen={attachments.menuOpen}
+                menuProgress={menuProgress}
+                draft={draft}
+                fallbackBackground={fieldBackground}
+                foreground={foreground}
+                liquidGlassAvailable={liquidGlassAvailable}
+                muted={muted}
+                raised={raised}
+                onChangeDraft={setDraft}
+                onSend={(text) => void send(text)}
+                onStop={
+                  task?.state === "running" && !answersQuestion ? () => threadActions.run(task, "stop") : undefined
+                }
+                stopping={task ? threadActions.acting(task) : false}
+                keyboardProgress={motion.keyboardProgress}
+                voice={dictationVoice(voice, t)}
+                voiceAccent={accent}
+              />
+            </>
           )}
         </Animated.View>
       </KeyboardGestureArea>

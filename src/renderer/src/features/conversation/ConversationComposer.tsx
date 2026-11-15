@@ -44,11 +44,13 @@ import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, createStore, Loading, lazy, Show } from "solid-js";
 import { reportErrorBanner, reportNotification } from "../../error-reports";
 import { deviceSendShortcut, sendShortcutAriaKey, sendShortcutHintKey } from "../../send-shortcut-preference";
+import { serverCanAdminister } from "../servers/server-capabilities";
 import { speechReading } from "../speech/speech-playback";
 import { stopSpokenReply } from "../speech/speech-replies";
 import { copyComposerSelection, readComposerCopy } from "./composer-clipboard";
 import { createComposerResize } from "./composer-resize";
 import { useConversationViewScope } from "./conversation-scope";
+import { ConversationSkillMode } from "./SkillModeControl";
 import { currentConversationTarget } from "./stores/composer-store";
 
 // Module scope: the composer remounts on navigation, and a dismissed notice must stay dismissed.
@@ -147,6 +149,11 @@ export function ConversationComposer() {
       : props.agent?.name
         ? t("composer.placeholder.message", { name: props.agent.name })
         : t("composer.placeholder.messageAgent");
+  const skillModeTarget = () => {
+    if (channel || !props.agent || !serverCanAdminister(props.server, "skill-modes-v1")) return null;
+    const threadId = props.threads?.open === undefined ? props.agent.threadId : props.threads.conversation?.threadId;
+    return threadId ? { agentId: props.agent.id, threadId } : null;
+  };
   const [skillPickerRequest, setSkillPickerRequest] = createSignal(0);
   /** A skill belongs to one agent, and a channel message goes to the agents it routes to. */
   const pickSkill = () => (channel ? undefined : () => setSkillPickerRequest((current) => current + 1));
@@ -509,6 +516,12 @@ export function ConversationComposer() {
         </Show>
         {/* One card for everything above the input: see composer-stack.css. */}
         <div class="composer-stack">
+          <ConversationSkillMode
+            target={skillModeTarget()}
+            skills={installedSkills()}
+            server={props.server}
+            runtime={props.runtime}
+          />
           <ComposerStackCard when={awaitingVisible() && awaitingReplies()}>
             {(items) => (
               <AwaitingReplies

@@ -161,6 +161,7 @@ export interface AgentThreadQueue {
 }
 
 export interface AgentThreadViewProps {
+  modeControl?: JSX.Element;
   /** Null for a new thread: its first message starts it. */
   task: AgentTask | null;
   /** How many threads of the agent can run at the same time. */
@@ -925,6 +926,7 @@ export function AgentThreadView(props: AgentThreadViewProps) {
       <div class="composer-wrap">
         {/* One card for everything above the input: see composer-stack.css. */}
         <div class="composer-stack">
+          {props.modeControl}
           <ComposerStackCard when={failed()}>
             {(task) => (
               <ComposerNotice

@@ -154,6 +154,7 @@ import {
   type WorkflowMediaSpecs,
   workspaceAccessEnforced,
 } from "@openbot/contracts/ipc";
+import type { SetSkillModeInput, SkillModeTarget } from "@openbot/contracts/ipc-skill-mode";
 import { AGENT_THREAD_READS_LIMIT } from "@openbot/contracts/team-protocol/agent-thread-reads-v1";
 import { CLAUDE_API_KEY_ACCOUNT_ID } from "@openbot/contracts/team-protocol/claude-api-key-v1";
 import { ContextCompactRefusedError } from "@openbot/contracts/team-protocol/context-compact-v1";
@@ -251,6 +252,7 @@ import { SessionSettings } from "./agent/session-settings";
 import { SIDE_QUESTION_CHAT_MESSAGES, sideQuestionPrompt } from "./agent/side-question";
 import type { AgentSidebar } from "./agent/sidebar-tools";
 import type { SkillLearner } from "./agent/skill-learning";
+import { type SkillModeResolver, SkillModes } from "./agent/skill-modes";
 import type { LocalSkillTools } from "./agent/skill-tools";
 import {
   agentProviderAccount,
@@ -362,6 +364,7 @@ interface AgentServiceEvents {
 }
 
 export interface AgentServiceOptions {
+  skillModeSource?: SkillModeResolver;
   store: AgentStore;
   mailbox: MailboxStore;
   browser: AgentBrowserHost;
@@ -632,6 +635,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly #usageLimits: UsageLimitGate;
   readonly #drain: DrainScheduler;
   readonly #sessionSettings: SessionSettings;
+  readonly skillModes: SkillModes;
   readonly #liveVoice: LiveVoice;
   readonly #queue: QueueControls;
   readonly #attachments: AttachmentGateway;
@@ -1333,7 +1337,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       isStopping: () => this.#stopping,
       hasTakeover: (agentId) => this.#attention.hasBrowserTakeoverForAgent(agentId),
     });
+    this.skillModes = new SkillModes(store.database, options.skillModeSource);
     this.#threads = new ThreadLifecycle({
+      skillModes: this.skillModes,
       store,
       mailbox,
       conversation: this.#conversation,
@@ -3431,6 +3437,20 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     const agent = this.#store.setMarketplaceSource(agentId, source);
     this.#emit({ type: "agents-changed", agents: this.listAgents() });
     return agent;
+  }
+
+  readSkillMode(target: SkillModeTarget) {
+    return this.skillModes.read(target);
+  }
+  setSkillMode(input: SetSkillModeInput) {
+    return this.skillModes.set(input).pipe(
+      Effect.tap(() =>
+        Effect.sync(() => {
+          for (const threadId of this.skillModes.affectedThreads(input))
+            this.#emit({ type: "skill-mode-changed", agentId: input.agentId, threadId });
+        }),
+      ),
+    );
   }
 
   readAgentSessionSettings(agentId: string): Effect.Effect<AgentSessionSettings, AgentLifecycleFailed> {

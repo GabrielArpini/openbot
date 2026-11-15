@@ -133,6 +133,7 @@ import { SIDEBAR_PINS_CODECS } from "./sidebar-pins-v1";
 import { SIGN_IN_RELAY_DEEP_LINK_CODECS } from "./sign-in-relay-deep-link-v1";
 import { SIGN_IN_RELAY_CODECS } from "./sign-in-relay-v1";
 import { SKILL_LEARNING_CODECS } from "./skill-learning-v1";
+import { SKILL_MODES_CODECS } from "./skill-modes-v1";
 import { SKILLS_ADMIN_CODECS } from "./skills-admin-v1";
 import { STORAGE_CHANNEL_CODECS } from "./storage-channel-v1";
 import { STORAGE_DISK_CODECS } from "./storage-disk-v1";
@@ -172,6 +173,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...CUSTOM_PROVIDER_HARNESS_CODECS,
   ...CUSTOM_PROVIDER_EDIT_CODECS,
   ...CUSTOM_AGENTS_CODECS,
+  ...SKILL_MODES_CODECS,
   ...AGENT_SESSION_SETTINGS_CODECS,
   ...ACP_REGISTRY_CODECS,
   ...HOST_ADMIN_CODECS,

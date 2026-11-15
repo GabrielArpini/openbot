@@ -102,6 +102,7 @@ import {
   decodeWebhookSecret,
   decodeWebhookTestResult,
 } from "@openbot/contracts/ipc-events";
+import { decodeSkillModeState } from "@openbot/contracts/ipc-skill-mode";
 import { contextBridge, ipcRenderer, webUtils } from "electron";
 import {
   decodeAccountUsageFromMain,
@@ -616,6 +617,8 @@ const agentGroup = bridgeGroup(IPC_ENDPOINTS.agent, {
   getUsage: decodeAccountUsageFromMain,
   listModels: decodeAgentModels,
   listAgents: decodeAgents,
+  readSkillMode: decodeSkillModeState,
+  setSkillMode: decodeSkillModeState,
   readAgentSessionSettings: decodeAgentSessionSettingsFromMain,
   setAgentSessionSetting: decodeAgentSessionSettingsFromMain,
   resetAgentSessionSetting: decodeAgentSessionSettingsFromMain,

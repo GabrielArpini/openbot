@@ -89,6 +89,7 @@ import {
   withHostProviderAccountModels,
   withWhatsAppWorkingMessages,
 } from "@openbot/contracts/ipc";
+import type { SkillModeState } from "@openbot/contracts/ipc-skill-mode";
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { TEAM_PROTOCOL_V1_WEBSOCKET } from "@openbot/contracts/team-protocol";
@@ -345,6 +346,7 @@ import { SIDE_QUESTION_CAPABILITY, SIDE_QUESTION_ROUTES } from "@openbot/contrac
 import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
 import { SIDEBAR_PINS_CAPABILITY, SIDEBAR_PINS_ROUTES } from "@openbot/contracts/team-protocol/sidebar-pins-v1";
 import { SKILL_LEARNING_CAPABILITY, SKILL_LEARNING_ROUTES } from "@openbot/contracts/team-protocol/skill-learning-v1";
+import { SKILL_MODES_CAPABILITY, SKILL_MODES_ROUTES } from "@openbot/contracts/team-protocol/skill-modes-v1";
 import { SKILLS_ADMIN_CAPABILITY, SKILLS_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/skills-admin-v1";
 import { STORAGE_DISK_CAPABILITY, STORAGE_DISK_ROUTES } from "@openbot/contracts/team-protocol/storage-disk-v1";
 import {
@@ -2225,6 +2227,25 @@ try {
     chat: new TeamChatStore(database),
     // The real host-settings service, over an agent writer that records each change.
     admin: {
+      skillModes: {
+        readSkillMode: (target) => ({ ...target, selection: null }),
+        setSkillMode: (input) =>
+          Effect.sync((): SkillModeState => {
+            record("setSkillMode", input.agentId, input.skillId, input.scope);
+            return {
+              agentId: input.agentId,
+              threadId: input.threadId,
+              inherited: input.scope === "inherit",
+              agentDefault:
+                input.scope === "agent" && input.skillId
+                  ? { skillId: input.skillId, name: "Test mode", revision: 1, sha256: "a".repeat(64) }
+                  : null,
+              selection: input.skillId
+                ? { skillId: input.skillId, name: "Test mode", revision: 1, sha256: "a".repeat(64) }
+                : null,
+            };
+          }),
+      },
       skills: githubSkillsAdmin,
       customAgents: {
         list: () => Effect.succeed(customAgentList),
@@ -2990,6 +3011,65 @@ try {
     errorIs(refusedTicket, 401, sourceText("error.team.signInRequired")),
     summary(refusedTicket),
   );
+
+  // Mode routes must negotiate their own capability and preserve the admin boundary.
+  {
+    const options = {
+      token: owner.sessionToken,
+      protocol: 9,
+      capabilities: [SKILL_MODES_CAPABILITY],
+      json: { agentId: "agent-ada", threadId: "mode-test-thread", skillId: "local-skill-test" },
+    };
+    const selected = await call("POST", SKILL_MODES_ROUTES.set, options);
+    const cleared = await call("POST", SKILL_MODES_ROUTES.set, {
+      ...options,
+      json: { ...options.json, skillId: null },
+    });
+    const read = await call("POST", SKILL_MODES_ROUTES.read, options);
+    const defaultSet = await call("POST", SKILL_MODES_ROUTES.set, {
+      ...options,
+      json: { ...options.json, scope: "agent" },
+    });
+    const defaultInput = calls.filter((entry) => entry.method === "setSkillMode").at(-1);
+    const inherited = await call("POST", SKILL_MODES_ROUTES.set, {
+      ...options,
+      json: { ...options.json, skillId: null, scope: "inherit" },
+    });
+    const inheritedInput = calls.filter((entry) => entry.method === "setSkillMode").at(-1);
+    const invalidScope = await call("POST", SKILL_MODES_ROUTES.set, {
+      ...options,
+      json: { ...options.json, scope: ["agent"] },
+    });
+    check(
+      "skill mode defaults and inheritance preserve their scope through the host",
+      defaultSet.status === 200 &&
+        field(defaultSet.body, "agentDefault", "skillId") === "local-skill-test" &&
+        defaultInput?.args[2] === "agent" &&
+        inherited.status === 200 &&
+        field(inherited.body, "inherited") === true &&
+        inheritedInput?.args[2] === "inherit",
+      [summary(defaultSet), summary(inherited)],
+    );
+    check(
+      "skill mode scope rejects an array before mutation",
+      invalidScope.status !== 200 && calls.filter((entry) => entry.method === "setSkillMode").at(-1) === inheritedInput,
+      summary(invalidScope),
+    );
+    const old = await call("POST", SKILL_MODES_ROUTES.set, { ...options, capabilities: [] });
+    const member = await call("POST", SKILL_MODES_ROUTES.set, { ...options, token: bobToken });
+    check(
+      "skill mode select/read/clear round-trip through the host",
+      selected.status === 200 &&
+        cleared.status === 200 &&
+        field(cleared.body, "selection") === null &&
+        read.status === 200,
+      [summary(selected), summary(cleared), summary(read)],
+    );
+    check("skill mode selection requires capability and admin role", old.status === 400 && member.status === 403, [
+      summary(old),
+      summary(member),
+    ]);
+  }
 
   // ---- Auth gate ----
   {

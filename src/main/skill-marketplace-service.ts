@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
-import { lstat, mkdir, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
+import { lstat, mkdir, open, readdir, readFile, realpath, rename, rm, stat, writeFile } from "node:fs/promises";
+import { homedir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
@@ -29,19 +30,24 @@ import {
   parseGithubSkillId,
   SKILL_DESCRIPTION_MAX_LENGTH,
 } from "@openbot/contracts/ipc";
+import { SKILL_MODE_MAX_CHARACTERS } from "@openbot/contracts/ipc-skill-mode";
 import { isBoolean, isDynamicRecord, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { Cache, Effect, Exit, Result, Schema, Semaphore } from "effect";
 import { parse as parseYaml } from "yaml";
+import { SkillModeFailed, type SkillModeSource } from "../backend/agent/skill-modes";
 import type { AgentLifecycleFailed } from "../backend/agent-service";
 import { isHeldTargetError, writeFileAtomically } from "../backend/atomic-json-file";
 import { causeHelpers } from "../backend/effect-boundary";
+import { isPathInside } from "../backend/path-containment";
+import { readSkillFrontmatter } from "../backend/skill-frontmatter";
 import { toArrayBuffer } from "./agent-marketplace-service";
 import type { CentralAuthManager } from "./central-auth-manager";
 import type { GithubSkillSourceReader } from "./github-skill-source";
 import { type LocalSkillLibrary, quotedSkillMarkdown } from "./local-skill-library";
 import { listManagedSkillsForChat, MANAGED_SKILL_FOLDERS, MANAGED_SKILL_SLUGS } from "./managed-skill-service";
 import { listFolderSkills, listHomeFolderSkills } from "./skill-folder-discovery";
+import { readSkillModeBundle } from "./skill-mode-bundle";
 import {
   archiveDirectory,
   FINDER_METADATA_FILE,
@@ -214,6 +220,48 @@ export class SkillMarketplaceService {
       this.#drafts.delete(input.draftId);
       return { ...submission, iconUrl: this.absoluteUrl(submission.iconUrl) };
     });
+  }
+
+  /** Resolves an installed ID on the host. The client never supplies a path or body. */
+  readModeSource(agentId: string, skillId: string): Effect.Effect<SkillModeSource, SkillModeFailed> {
+    return Effect.gen({ self: this }, function* () {
+      const skills = yield* this.listInstalledForChatTags(agentId);
+      const skill = skills.find((entry) => entry.skillId === skillId);
+      if (!skill || skill.enabled === false || skill.problem || skill.state !== "installed")
+        return yield* new SkillMarketplaceFailure({ cause: new Error(sourceText("error.skill.mode.invalid")) });
+      const agent = yield* skillSync(() => this.requireAgent(agentId));
+      const home = skillId.startsWith("home:");
+      const root = home ? join(homedir(), ".agents", "skills", skill.slug) : agent.workspacePath;
+      const file = home
+        ? join(root, "SKILL.md")
+        : join(root, skill.location ?? join(".agents", "skills", skill.slug), "SKILL.md");
+      const text = yield* skillIO(async () => {
+        const canonicalRoot = await realpath(root);
+        const canonicalFile = await realpath(file);
+        if (!isPathInside(canonicalRoot, canonicalFile)) throw new Error(sourceText("error.skill.mode.outside"));
+        const handle = await open(canonicalFile, "r");
+        try {
+          const info = await handle.stat();
+          if (!info.isFile() || info.size > SKILL_MODE_MAX_CHARACTERS * 4)
+            throw new Error(sourceText("error.skill.mode.size"));
+          const bytes = Buffer.alloc(SKILL_MODE_MAX_CHARACTERS * 4 + 1);
+          let total = 0;
+          while (total < bytes.length) {
+            const read = await handle.read(bytes, total, bytes.length - total, total);
+            if (read.bytesRead === 0) break;
+            total += read.bytesRead;
+          }
+          if (total > SKILL_MODE_MAX_CHARACTERS * 4) throw new Error(sourceText("error.skill.mode.size"));
+          return bytes.subarray(0, total).toString("utf8");
+        } finally {
+          await handle.close();
+        }
+      });
+      if (readSkillFrontmatter(text, skill.name).problem)
+        return yield* new SkillMarketplaceFailure({ cause: new Error(sourceText("error.skill.mode.frontmatter")) });
+      const bundle = yield* readSkillModeBundle(dirname(file), text);
+      return { skillId, name: skill.name, revision: skill.installedVersion, text: bundle };
+    }).pipe(Effect.mapError((failure) => new SkillModeFailed({ cause: failure.cause })));
   }
 
   listInstalled(agentId: string): Effect.Effect<InstalledSkill[], SkillMarketplaceFailure> {

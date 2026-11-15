@@ -641,6 +641,7 @@ interface HistoryItemPage {
 function withoutTurnContextParams(params: unknown): DynamicRecord {
   if (!isRecord(params)) return {};
   const {
+    skillModeInstructions: _skillMode,
     memoryContext: _memories,
     sectionTeammates: _section,
     savedLogins: _logins,

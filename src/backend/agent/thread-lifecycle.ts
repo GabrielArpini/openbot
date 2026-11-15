@@ -72,6 +72,7 @@ import {
 import { decodeCapturedSteps, readCapturedSteps } from "./handoff-tool-steps";
 import { isProviderTimeout } from "./provider-status";
 import { sessionSettingsIdentity } from "./session-settings";
+import { SkillModes, skillModeInstructions } from "./skill-modes";
 import { isArchivedThreadError, isMissingProviderSessionError, providerLabel } from "./thread-items";
 import { visibleDynamicTools } from "./tool-catalog";
 import {
@@ -180,6 +181,7 @@ export interface ThreadLifecycleHooks {
 }
 
 export interface ThreadLifecycleOptions {
+  skillModes?: SkillModes;
   store: AgentStore;
   mailbox: MailboxStore;
   conversation: ConversationRuntime;
@@ -248,6 +250,7 @@ export class ThreadLifecycle {
   readonly #store: AgentStore;
   readonly #mailbox: MailboxStore;
   readonly #conversation: ConversationRuntime;
+  readonly #skillModes: SkillModes;
   readonly #memories: AgentMemories;
   readonly #compaction: ContextCompaction;
   readonly #hooks: ThreadLifecycleHooks;
@@ -307,6 +310,7 @@ export class ThreadLifecycle {
     this.#store = options.store;
     this.#mailbox = options.mailbox;
     this.#conversation = options.conversation;
+    this.#skillModes = options.skillModes ?? new SkillModes(options.store.database);
     this.#memories = options.memories;
     this.#compaction = options.compaction;
     this.#hooks = options.hooks;
@@ -521,6 +525,9 @@ export class ThreadLifecycle {
       currentAgent: this.#store.list().find((candidate) => candidate.id === agent.id) ?? agent,
       session: this.#store.database.activeProviderSession(publicThreadId, agent.provider),
     }));
+    const selectedMode = yield* this.#skillModes
+      .resolve({ agentId: agent.id, threadId: publicThreadId })
+      .pipe(toThreadOperationFailed);
     if (session) {
       this.#conversation.bindThread(session.externalSessionId, agent.id, publicThreadId);
       const handoff = yield* Effect.result(
@@ -530,6 +537,7 @@ export class ThreadLifecycle {
       else if (!missingSessionFile(handoff.failure.cause)) return yield* handoff.failure;
       // A tool/config change replaces only the provider session, never the public thread.
       if (
+        !this.#skillModes.sessionMatches(`${client.provider}:${session.externalSessionId}`, selectedMode) ||
         !(yield* this.#hasCurrentSessionTools(
           this.#sessionAgent(currentAgent, publicThreadId),
           client,
@@ -797,6 +805,9 @@ export class ThreadLifecycle {
     const proxy = client.provider === "codex" ? yield* this.#proxyFingerprint(mcpServers) : null;
     // The same single reading, so the manifest records the file text these instructions carry.
     const instructionsFile = yield* this.#instructionsFile(agent, client);
+    const mode = yield* this.#skillModes
+      .resolve({ agentId: agent.id, threadId: publicThreadId })
+      .pipe(toThreadOperationFailed);
     const config = yield* this.codexConfigEffect(agent, client, mcpServers, own, toolRuntimes, environment);
     const params: DynamicRecord = {
       ...config,
@@ -823,11 +834,12 @@ export class ThreadLifecycle {
         mcpServers,
         instructionsFile,
         yield* this.#workspaceSkills(agent, client),
+        skillModeInstructions(mode),
       ),
       serviceName: "openbot",
       dynamicTools: visibleDynamicTools(client.provider),
     };
-    return { agent, mcpServers, toolRuntimes, own, environment, proxy, instructionsFile, params };
+    return { agent, mcpServers, toolRuntimes, own, environment, proxy, instructionsFile, params, mode };
   });
 
   readonly #startProviderThread = Effect.fn("ThreadLifecycle.prepareProviderThread")(function* (
@@ -839,7 +851,7 @@ export class ThreadLifecycle {
   ) {
     // Read before the params: a change that lands after it then resumes the session at the next turn.
     const givenContext = yield* this.#turnContextKey(owner, client);
-    const { agent, mcpServers, toolRuntimes, own, environment, proxy, instructionsFile, params } =
+    const { agent, mcpServers, toolRuntimes, own, environment, proxy, instructionsFile, params, mode } =
       yield* this.#startParams(owner, client, publicThreadId);
     // Before the request, with the same reading, as the Codex manifest: a sign-in or a download that
     // finishes while the provider answers is not what this session was given.
@@ -864,6 +876,9 @@ export class ThreadLifecycle {
     this.#sessionStarts.set(key, count);
     logger.info("Started a provider session.", { provider: client.provider, reason: startReason, count });
     const externalThreadId = response.thread.id;
+    yield* threadStep(() =>
+      this.#skillModes.recordSession(publicThreadId, `${client.provider}:${externalThreadId}`, mode),
+    );
     const prepared = yield* Effect.result(
       Effect.gen({ self: this }, function* () {
         if (client.provider === "codex") {
@@ -1469,6 +1484,7 @@ export class ThreadLifecycle {
     mcpServers: readonly McpServerConfig[],
     instructionsFile: InstructionsFileInPrompt,
     workspaceSkills: readonly string[] = [],
+    modeInstructions = "",
   ): DynamicRecord {
     const memories = this.#memories.essentialFor(agent.id);
     const options = {
@@ -1516,7 +1532,8 @@ export class ThreadLifecycle {
     );
     return options.memoriesInTurns
       ? {
-          developerInstructions: instructions,
+          developerInstructions: `${instructions}\n${modeInstructions}`,
+          skillModeInstructions: modeInstructions,
           memoryContext: memoryContext(memories, options),
           sectionTeammates: section,
           savedLogins: options.passwordVault,
@@ -1524,7 +1541,7 @@ export class ThreadLifecycle {
           // Measured for Claude only: deep in a long thread, it skipped the natural style's first line.
           ...(options.responseStyle === "natural" && client.provider === "claude" ? { turnStyleReminder: true } : {}),
         }
-      : { developerInstructions: instructions };
+      : { developerInstructions: `${instructions}\n${modeInstructions}` };
   }
 
   /**
@@ -1590,6 +1607,9 @@ export class ThreadLifecycle {
     yield* checkAgentFolders(agent);
     const configs = this.#agentMcpServers(agent);
     const toolRuntimes = this.#toolRuntimes();
+    const mode = yield* this.#skillModes
+      .resolve({ agentId: agent.id, threadId: publicThreadId })
+      .pipe(toThreadOperationFailed);
     return {
       threadId: externalThreadId,
       model: agent.model,
@@ -1613,6 +1633,7 @@ export class ThreadLifecycle {
         configs,
         yield* this.#instructionsFile(agent, client),
         yield* this.#workspaceSkills(agent, client),
+        skillModeInstructions(mode),
       ),
       ...(client.provider === "codex" ? {} : { dynamicTools: visibleDynamicTools(client.provider) }),
       ...(yield* this.codexConfigEffect(

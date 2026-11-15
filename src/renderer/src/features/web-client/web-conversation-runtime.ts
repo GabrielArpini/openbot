@@ -10,6 +10,7 @@ import {
   type TeamRealtimeEvent,
   type TestRoutineInput,
 } from "@openbot/contracts/ipc";
+import { decodeSkillModeState } from "@openbot/contracts/ipc-skill-mode";
 import { AGENT_FOLDERS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-folders-v1";
 import { AGENT_INSTRUCTIONS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-instructions-v1";
 import { AGENT_MEMORY_LIMIT_CAPABILITY } from "@openbot/contracts/team-protocol/agent-memory-limit-v1";
@@ -23,6 +24,7 @@ import {
 import { ROUTINES_ONCE_CAPABILITY } from "@openbot/contracts/team-protocol/routines-once-v1";
 import { decodeSideQuestionResponse, SIDE_QUESTION_ROUTES } from "@openbot/contracts/team-protocol/side-question-v1";
 import { SKILL_LEARNING_ROUTES } from "@openbot/contracts/team-protocol/skill-learning-v1";
+import { SKILL_MODES_ROUTES } from "@openbot/contracts/team-protocol/skill-modes-v1";
 import { runTeamEffect } from "@openbot/team-client";
 import {
   deleteSharedTable,
@@ -315,6 +317,10 @@ export function createWebConversationRuntime(
   const agentMemoryLimit = adminRequest ? webAgentMemoryLimit(adminRequest) : undefined;
   const administers = (capability: string) => canAdminister?.(capability) === true;
   return {
+    onSkillModeChanged: (listener) =>
+      onHostEvent?.((event) => {
+        if (event.type === "skill-mode-changed") listener(event.threadId);
+      }) ?? (() => {}),
     agent: {
       ...messageLinks,
       importAttachmentData: async (data, serverId) => {
@@ -347,6 +353,14 @@ export function createWebConversationRuntime(
         return remote.editQueue(input);
       },
       // The skills store asks only a host that serves `installed-skills`, and the MCP store only as an admin.
+      readSkillMode: async (input) => {
+        if (!adminRequest) return unavailable();
+        return adminRequest()("POST", SKILL_MODES_ROUTES.read, decodeSkillModeState, { ...input });
+      },
+      setSkillMode: async (input) => {
+        if (!adminRequest) return unavailable();
+        return adminRequest()("POST", SKILL_MODES_ROUTES.set, decodeSkillModeState, { ...input });
+      },
       listInstalledSkills: async (agentId) =>
         adminRequest
           ? Effect.runPromise(

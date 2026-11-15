@@ -1,3 +1,4 @@
+import { runCauseEffect } from "../src/backend/effect-boundary";
 // Run: bun scripts/skill-install-local-changes-e2e.ts
 // Report: .openbot-build/skill-install-local-changes-e2e.json; exit 0 = all pass.
 // Drives the real local skill library and skill service in a temporary workspace (#7072).
@@ -6,7 +7,8 @@
 // A copy with an edit that no revision has still refuses, and the user's replace still installs.
 
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { AgentSummary } from "@openbot/contracts/ipc";
@@ -16,6 +18,7 @@ import { CentralAuthManager } from "../src/main/central-auth-manager";
 import { LocalSkillLibrary } from "../src/main/local-skill-library";
 import { localSkillTools } from "../src/main/local-skill-tools";
 import { SkillMarketplaceService } from "../src/main/skill-marketplace-service";
+import { readSkillModeBundle } from "../src/main/skill-mode-bundle";
 
 const AGENT_ID = "agent-7072";
 const REFUSED = sourceText("error.skill.replaceModified");
@@ -186,6 +189,98 @@ await scenario("G Copies at the new revision and at another saved revision insta
   const after = await installedState(context);
   assert.equal(after, "installed@3");
   return { revise, after };
+});
+
+await scenario(
+  "H Mode source resolves full installed body and rejects disabled or modified copies",
+  async (context) => {
+    const original = await runCauseEffect(context.service.readModeSource(AGENT_ID, context.skillId));
+    assert.equal(
+      original.text,
+      await readFile(join(context.workspace, ".agents/skills", context.slug, "SKILL.md"), "utf8"),
+    );
+    assert.equal(original.revision, 1);
+    await Effect.runPromise(
+      context.service.setEnabled({ agentId: AGENT_ID, skillId: context.skillId, enabled: false }),
+    );
+    assert.ok(await failure(context.service.readModeSource(AGENT_ID, context.skillId)));
+    await Effect.runPromise(context.service.setEnabled({ agentId: AGENT_ID, skillId: context.skillId, enabled: true }));
+    await writeCopies(context, "SKILL.md", skillMarkdown("First.", "Unregistered edit."));
+    assert.ok(await failure(context.service.readModeSource(AGENT_ID, context.skillId)));
+    assert.ok(await failure(context.service.readModeSource(AGENT_ID, "local-skill-missing")));
+    return { fullBody: "passed", disabledRefused: "passed", modifiedRefused: "passed", missingRefused: "passed" };
+  },
+);
+
+await scenario("I Declared bundle loads recursively and rejects graph or source changes", async (context) => {
+  const source = join(context.workspace, "source");
+  const root = await readFile(join(source, "SKILL.md"), "utf8");
+  const child = `\uFEFF${skillMarkdown("Conditional method.", "UNIQUE_DEPENDENCY_BODY")}`;
+  await mkdir(join(source, "method"));
+  await writeFile(join(source, "method/SKILL.md"), child);
+  const hash = (body: string) => createHash("sha256").update(body).digest("hex");
+  const childDependencies: { path: string; when: string }[] = [];
+  const manifest = {
+    version: 1,
+    root: "SKILL.md",
+    nodes: {
+      "SKILL.md": {
+        sha256: hash(root),
+        revision: null,
+        dependencies: [
+          { path: "method/SKILL.md", when: "Only for code changes" },
+          { path: "method/SKILL.md", when: "Also for review" },
+        ],
+      },
+      "method/SKILL.md": { sha256: hash(child), revision: null, dependencies: childDependencies },
+    },
+  };
+  let revision = 1;
+  const save = async () => {
+    await writeFile(join(source, "mode-context.json"), JSON.stringify(manifest));
+    assert.equal(await reviseFrom(context, revision++, "source"), null);
+  };
+  await save();
+  const loaded = await runCauseEffect(context.service.readModeSource(AGENT_ID, context.skillId));
+  assert.equal(loaded.text.split("UNIQUE_DEPENDENCY_BODY").length, 2, "shared body included once");
+  assert.ok(loaded.text.includes("Only for code changes") && loaded.text.includes("Also for review"));
+  manifest.nodes["method/SKILL.md"].dependencies.push({ path: "SKILL.md", when: "Cycle" });
+  await save();
+  assert.ok(await failure(context.service.readModeSource(AGENT_ID, context.skillId)), "cycle refused");
+  manifest.nodes["method/SKILL.md"].dependencies = [];
+  manifest.nodes["method/SKILL.md"].sha256 = "0".repeat(64);
+  await save();
+  assert.ok(await failure(context.service.readModeSource(AGENT_ID, context.skillId)), "hash drift refused");
+  manifest.nodes["method/SKILL.md"].sha256 = hash(child);
+  const firstEdge = manifest.nodes["SKILL.md"].dependencies[0];
+  assert.ok(firstEdge);
+  firstEdge.path = "../outside.md";
+  await save();
+  assert.ok(await failure(context.service.readModeSource(AGENT_ID, context.skillId)), "path escape refused");
+  firstEdge.path = "missing/SKILL.md";
+  await save();
+  assert.ok(await failure(context.service.readModeSource(AGENT_ID, context.skillId)), "missing node refused");
+  firstEdge.path = "method/SKILL.md";
+  const largeChild = skillMarkdown("Conditional method.", "x".repeat(31800));
+  await writeFile(join(source, "method/SKILL.md"), largeChild);
+  manifest.nodes["method/SKILL.md"].sha256 = hash(largeChild);
+  await save();
+  assert.ok(await failure(context.service.readModeSource(AGENT_ID, context.skillId)), "aggregate overflow refused");
+  await rm(join(source, "mode-context.json"));
+  await symlink("absent-manifest.json", join(source, "mode-context.json"));
+  assert.ok(await failure(readSkillModeBundle(source, root)), "dangling manifest is not treated as absent");
+  return {
+    recursiveBody: "passed",
+    deduplication: "passed",
+    conditions: "passed",
+    cycle: "refused",
+    drift: "refused",
+    escape: "refused",
+    missing: "refused",
+    aggregateOverflow: "refused",
+    bomHash: "passed",
+    danglingManifest: "refused",
+  };
 });
 
 await mkdir(".openbot-build", { recursive: true });

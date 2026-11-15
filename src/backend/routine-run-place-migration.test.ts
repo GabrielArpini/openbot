@@ -75,6 +75,9 @@ const LATER_TABLES = {
   agent_usage_skill_loads: [],
   projection_messaging_pings: [],
   projection_messaging_history: [],
+  agent_skill_mode_defaults: [],
+  thread_skill_modes: [],
+  provider_session_skill_modes: [],
   projection_pinned_thread_messages: [],
 };
 
@@ -94,7 +97,7 @@ function columns(db: DatabaseSync, table: string): string[] {
 }
 
 function expectHealthy(db: DatabaseSync): void {
-  expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 62 });
+  expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 63 });
   expect(db.prepare("PRAGMA foreign_keys").get()).toEqual({ foreign_keys: 1 });
   expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
   expect(db.prepare("PRAGMA integrity_check").get()).toEqual({ integrity_check: "ok" });
@@ -153,9 +156,9 @@ describe("agent routine run place migration", () => {
     seed(db);
     const before = contents(db);
     const columnsBefore = columns(db, "projection_agent_routines");
-    db.exec("INSERT INTO schema_migrations VALUES(63,'now')");
+    db.exec("INSERT INTO schema_migrations VALUES(64,'now')");
     expect(() => migrateOpenBotDatabase(db)).toThrow("newer than this application supports");
-    db.exec("DELETE FROM schema_migrations WHERE version=63; DELETE FROM schema_migrations WHERE version=54");
+    db.exec("DELETE FROM schema_migrations WHERE version=64; DELETE FROM schema_migrations WHERE version=54");
     expect(() => migrateOpenBotDatabase(db)).toThrow("missing version 54");
     expect(contents(db)).toEqual(before);
     expect(columns(db, "projection_agent_routines")).toEqual(columnsBefore);
@@ -167,7 +170,7 @@ describe("agent routine run place migration", () => {
     migrateOpenBotDatabase(db);
     const after = contents(db);
     // An application one release older knows versions up to 61 at most: version 62 is newer than it supports.
-    db.exec("INSERT INTO schema_migrations VALUES(63,'now')");
+    db.exec("INSERT INTO schema_migrations VALUES(64,'now')");
     expect(() => migrateOpenBotDatabase(db)).toThrow("newer than this application supports");
     expect(contents(db)).toEqual(after);
   });
