@@ -14,11 +14,7 @@ export interface SkillModeCalls {
   set(input: SetSkillModeInput): Promise<SkillModeState>;
 }
 /** The host owns the selection. Switching chats discards all stale reads and saves. */
-export function SkillModeControl(props: {
-  target: SkillModeTarget;
-  skills: readonly InstalledSkill[];
-  api: SkillModeCalls;
-}) {
+function SkillModeControl(props: { target: SkillModeTarget; skills: readonly InstalledSkill[]; api: SkillModeCalls }) {
   const { t, errorMessage } = useText();
   const [state, setState] = createStore<{ data: SkillModeState | null; busy: boolean; error: string | null }>({
     data: null,

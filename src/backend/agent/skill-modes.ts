@@ -148,7 +148,7 @@ export class SkillModes {
       .run(sessionId, threadId, modeKey(mode));
   }
 }
-export function modeKey(mode: ResolvedSkillMode | null): string {
+function modeKey(mode: ResolvedSkillMode | null): string {
   return JSON.stringify(mode?.selection ?? null);
 }
 /** The complete body is repeated every user turn, independently of optional skill tool calls. */
