@@ -113,9 +113,10 @@ process.stdin.on("data", (chunk) => {
 });
 `;
 
-/** One `turn/start` that OpenBot sent: its provider thread and the text of its input. */
+/** One `turn/start` that OpenBot sent: its provider thread, its text blocks and their joined text. */
 interface TurnStart {
   threadId: string;
+  blocks: string[];
   text: string;
 }
 
@@ -166,8 +167,8 @@ function turnStarts(): TurnStart[] {
     if (!isRecord(entry) || getString(entry, "method") !== "turn/start" || !isRecord(entry.params)) return [];
     const threadId = getString(entry.params, "threadId");
     const input = Array.isArray(entry.params.input) ? entry.params.input : [];
-    const text = input.flatMap((item) => (isRecord(item) && getString(item, "text")) || []).join("\n");
-    return threadId ? [{ threadId, text }] : [];
+    const blocks = input.flatMap((item) => (isRecord(item) && getString(item, "text")) || []);
+    return threadId ? [{ threadId, blocks, text: blocks.join("\n") }] : [];
   });
 }
 
@@ -230,7 +231,9 @@ try {
     assert.equal(status, "completed", mailbox.getDelivery(deliveryId)?.delivery.error ?? status);
   }
   const chatStarts = turnStarts().filter((start) => start.threadId === chatThread);
-  const merged = chatStarts[1]?.text ?? "";
+  // The user's text is the last block. Context blocks, such as the skill mode, come before it.
+  const mergedBlocks = chatStarts[1]?.blocks ?? [];
+  const merged = mergedBlocks.at(-1) ?? "";
   const turnIds = new Set(queued.map((deliveryId) => mailbox.getDelivery(deliveryId)?.delivery.turnId));
   report.queuedMessages = {
     turnStarts: chatStarts.length,
@@ -240,6 +243,10 @@ try {
   };
   assert.equal(chatStarts.length, 2, "the queued messages did not start one turn");
   assert.ok(merged.startsWith("This turn starts with 3 messages."), merged);
+  // Every ordinary turn repeats the skill mode block, also when no mode is selected.
+  const modeBlocks = mergedBlocks.filter((block) => block.startsWith("<openbot_skill_mode>"));
+  assert.equal(modeBlocks.length, 1, JSON.stringify(mergedBlocks));
+  assert.notEqual(mergedBlocks.at(-1), modeBlocks[0], "the skill mode block replaced the user's text");
   const order = ["Second message.", "Third message.", "Fourth message."].map((text) => merged.indexOf(text));
   assert.ok(order.every((index, position) => index >= 0 && (position === 0 || index > (order[position - 1] ?? -1))));
   assert.ok(report.queuedMessages.sharedTurnId, "the queued messages ran in different turns");

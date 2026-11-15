@@ -894,7 +894,8 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== AGENT_PENDING_RUNTIME_CAPABILITY &&
     capability !== BROWSER_SIGN_IN_STORAGE_CAPABILITY &&
     capability !== HOST_APPEARANCE_CAPABILITY &&
-    capability !== SIGN_IN_RELAY_DEEP_LINK_CAPABILITY,
+    capability !== SIGN_IN_RELAY_DEEP_LINK_CAPABILITY &&
+    capability !== SKILL_MODES_CAPABILITY,
 );
 /**
  * The capabilities that only a protocol 9 peer sends and gets. Protocols 7 and 8 read at most 128
@@ -1201,6 +1202,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== AGENT_PENDING_RUNTIME_CAPABILITY &&
       capability !== BROWSER_SIGN_IN_STORAGE_CAPABILITY &&
       capability !== HOST_APPEARANCE_CAPABILITY &&
-      capability !== SIGN_IN_RELAY_DEEP_LINK_CAPABILITY,
+      capability !== SIGN_IN_RELAY_DEEP_LINK_CAPABILITY &&
+      capability !== SKILL_MODES_CAPABILITY,
   );
 }
