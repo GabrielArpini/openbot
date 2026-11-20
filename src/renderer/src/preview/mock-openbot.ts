@@ -190,6 +190,7 @@ import {
   type WorkspaceDirectory,
 } from "@openbot/contracts/ipc";
 import { ACTIVE_QUEUE_STATUSES } from "@openbot/contracts/team-protocol/agent-active-queues-v1";
+import type { SkillModeSelection } from "@openbot/contracts/ipc-skill-mode";
 import { sourceText } from "@openbot/i18n/source";
 import {
   AGENT_IMPORT_PREVIEW,
@@ -2285,6 +2286,16 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         else levels.set(agentId, level);
         return notificationLevelsSnapshot(levels);
       },
+      readSkillMode: async (input) => previewModeState(input),
+      setSkillMode: async (input) => {
+        const selection = input.skillId
+          ? { skillId: input.skillId, name: input.skillId, revision: 1, sha256: "0".repeat(64) }
+          : null;
+        if (input.scope === "agent") previewAgentModes.set(input.agentId, selection);
+        else if (input.scope === "inherit") previewSkillModes.delete(input.threadId);
+        else previewSkillModes.set(input.threadId, selection);
+        return previewModeState(input);
+      },
       readAgentSessionSettings: async (agentId) => clone(previewSessionSettings(agentId)),
       setAgentSessionSetting: async ({ agentId, settingId, value }) => {
         const settings = previewSessionSettings(agentId);
@@ -4049,5 +4060,18 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       promptResponseListeners.clear();
       void appInfo;
     },
+  };
+}
+
+const previewSkillModes = new Map<string, SkillModeSelection | null>();
+const previewAgentModes = new Map<string, SkillModeSelection | null>();
+function previewModeState(input: { agentId: string; threadId: string }) {
+  const agentDefault = previewAgentModes.get(input.agentId) ?? null;
+  const inherited = !previewSkillModes.has(input.threadId);
+  return {
+    ...input,
+    inherited,
+    agentDefault,
+    selection: inherited ? agentDefault : (previewSkillModes.get(input.threadId) ?? null),
   };
 }

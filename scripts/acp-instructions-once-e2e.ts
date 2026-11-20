@@ -89,6 +89,9 @@ try {
     cwd: workspace,
     runtimeWorkspaceRoots: [workspace],
     developerInstructions,
+    ...(model === "context/default"
+      ? { skillModeInstructions: "<openbot_skill_mode>\nACP_FULL_MODE\n</openbot_skill_mode>" }
+      : {}),
   });
 
   // The context agent: one thread through each event that can take the instructions out of context.
@@ -130,6 +133,10 @@ try {
     await runCauseEffect(client.stop());
 
     const prompts = await readJsonl<Prompt>(join(root, "context.jsonl"));
+    assert.ok(
+      prompts.every((prompt) => prompt.context.some((block) => block.includes("ACP_FULL_MODE"))),
+      "Every prompt after compaction and process reconstruction carries the complete mode.",
+    );
     report.agents.context = { steps, prompts };
     check("context", steps, prompts);
     assert.equal(

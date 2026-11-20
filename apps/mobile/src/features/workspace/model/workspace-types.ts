@@ -196,6 +196,7 @@ import type {
   SaveEventRoutineResult,
   WebhookSecret,
 } from "@openbot/contracts/ipc-events";
+import type { SetSkillModeInput, SkillModeState, SkillModeTarget } from "@openbot/contracts/ipc-skill-mode";
 import type { ServerAppearance } from "@openbot/contracts/team-protocol/host-appearance-v1";
 import type { LiveVoiceSessionResponse, LiveVoiceStartRequest } from "@openbot/contracts/team-protocol/live-voice-v1";
 import type { QueueEditRequest } from "@openbot/contracts/team-protocol/queue-edit-v1";
@@ -1041,7 +1042,10 @@ export interface MobileWorkspaceContextValue {
    * and model. Without it, the host drops the choice and starts its own default.
    */
   canChooseNewAgentModel: (serverId: string) => boolean;
-  /** The agent forgets the messages before it. The host refuses while the agent works. */
+  /** An owner or admin of a host that advertises skill-modes-v1. */
+  canUseSkillModes: (serverId: string) => boolean;
+  readSkillMode: (input: SkillModeTarget, serverId: string) => Promise<SkillModeState>;
+  setSkillMode: (input: SetSkillModeInput, serverId: string) => Promise<SkillModeState>;
   loadAgentSessionSettings: (agentId: string, serverId: string) => Promise<AgentSessionSettings | null>;
   setAgentSessionSetting: (input: SetAgentSessionSettingInput, serverId: string) => Promise<AgentSessionSettings>;
   resetAgentSessionSetting: (input: ResetAgentSessionSettingInput, serverId: string) => Promise<AgentSessionSettings>;
@@ -1371,6 +1375,7 @@ type ServerCheckKey =
   | "canGiveWebhookSecretToAgent"
   | "canManageAgentSkills"
   | "canManageSharedTables"
+  | "canUseSkillModes"
   | "canManageAgentFolders"
   | "canNestSidebarFolders"
   | "canManageAgentAccess"

@@ -1,3 +1,5 @@
+import type { SkillModeState } from "@openbot/contracts/ipc-skill-mode";
+import { SKILL_MODES_CAPABILITY, SKILL_MODES_ROUTES } from "@openbot/contracts/team-protocol/skill-modes-v1";
 // Drives the real `TeamApiServer` on a loopback port over HTTP, as a remote client does. The team
 // store and the direct-message store are the real ones on temporary files. The agent service, the
 // mailbox and the browser are small in-memory stand-ins that record each call, so a check can show
@@ -2557,6 +2559,25 @@ try {
     skills: chatSkills,
     // The real host-settings service, over an agent writer that records each change.
     admin: {
+      skillModes: {
+        readSkillMode: (target) => ({ ...target, selection: null }),
+        setSkillMode: (input) =>
+          Effect.sync((): SkillModeState => {
+            record("setSkillMode", input.agentId, input.skillId, input.scope);
+            return {
+              agentId: input.agentId,
+              threadId: input.threadId,
+              inherited: input.scope === "inherit",
+              agentDefault:
+                input.scope === "agent" && input.skillId
+                  ? { skillId: input.skillId, name: "Test mode", revision: 1, sha256: "a".repeat(64) }
+                  : null,
+              selection: input.skillId
+                ? { skillId: input.skillId, name: "Test mode", revision: 1, sha256: "a".repeat(64) }
+                : null,
+            };
+          }),
+      },
       skills: githubSkillsAdmin,
       customAgents: {
         list: () => Effect.succeed(customAgentList),
@@ -3387,6 +3408,65 @@ try {
     errorIs(refusedTicket, 401, sourceText("error.team.signInRequired")),
     summary(refusedTicket),
   );
+
+  // Mode routes must negotiate their own capability and preserve the admin boundary.
+  {
+    const options = {
+      token: owner.sessionToken,
+      protocol: 10,
+      capabilities: [SKILL_MODES_CAPABILITY],
+      json: { agentId: "agent-ada", threadId: "mode-test-thread", skillId: "local-skill-test" },
+    };
+    const selected = await call("POST", SKILL_MODES_ROUTES.set, options);
+    const cleared = await call("POST", SKILL_MODES_ROUTES.set, {
+      ...options,
+      json: { ...options.json, skillId: null },
+    });
+    const read = await call("POST", SKILL_MODES_ROUTES.read, options);
+    const defaultSet = await call("POST", SKILL_MODES_ROUTES.set, {
+      ...options,
+      json: { ...options.json, scope: "agent" },
+    });
+    const defaultInput = calls.filter((entry) => entry.method === "setSkillMode").at(-1);
+    const inherited = await call("POST", SKILL_MODES_ROUTES.set, {
+      ...options,
+      json: { ...options.json, skillId: null, scope: "inherit" },
+    });
+    const inheritedInput = calls.filter((entry) => entry.method === "setSkillMode").at(-1);
+    const invalidScope = await call("POST", SKILL_MODES_ROUTES.set, {
+      ...options,
+      json: { ...options.json, scope: ["agent"] },
+    });
+    check(
+      "skill mode defaults and inheritance preserve their scope through the host",
+      defaultSet.status === 200 &&
+        field(defaultSet.body, "agentDefault", "skillId") === "local-skill-test" &&
+        defaultInput?.args[2] === "agent" &&
+        inherited.status === 200 &&
+        field(inherited.body, "inherited") === true &&
+        inheritedInput?.args[2] === "inherit",
+      [summary(defaultSet), summary(inherited)],
+    );
+    check(
+      "skill mode scope rejects an array before mutation",
+      invalidScope.status !== 200 && calls.filter((entry) => entry.method === "setSkillMode").at(-1) === inheritedInput,
+      summary(invalidScope),
+    );
+    const old = await call("POST", SKILL_MODES_ROUTES.set, { ...options, capabilities: [] });
+    const member = await call("POST", SKILL_MODES_ROUTES.set, { ...options, token: bobToken });
+    check(
+      "skill mode select/read/clear round-trip through the host",
+      selected.status === 200 &&
+        cleared.status === 200 &&
+        field(cleared.body, "selection") === null &&
+        read.status === 200,
+      [summary(selected), summary(cleared), summary(read)],
+    );
+    check("skill mode selection requires capability and admin role", old.status === 400 && member.status === 403, [
+      summary(old),
+      summary(member),
+    ]);
+  }
 
   // ---- Auth gate ----
   {

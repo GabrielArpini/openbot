@@ -9,6 +9,8 @@ export interface ConversationPort {
   dynamicIsland: Pick<OpenBotDesktopApi["dynamicIsland"], "openBrowserTakeover">;
   agent: Pick<
     OpenBotDesktopApi["agent"],
+    | "readSkillMode"
+    | "setSkillMode"
     | "addPreviewPage"
     | "readAgentSessionSettings"
     | "listAgentNotificationLevels"

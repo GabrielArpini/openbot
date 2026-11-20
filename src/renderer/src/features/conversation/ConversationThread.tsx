@@ -26,6 +26,7 @@ import { conversationRuntime } from "./conversation-runtime";
 import { useConversationViewScope } from "./conversation-scope";
 import type { ConversationThreads } from "./conversation-types";
 import { useThreadMarketplaceSuggestionCard } from "./MarketplaceSuggestionChatCard";
+import { ConversationSkillMode } from "./SkillModeControl";
 import { useThreadMcpSignInCard } from "./McpSignInChatCard";
 import { useMessageBackdropAction } from "./message-backdrop";
 import { useThreadSettingLinkCard } from "./SettingLinkChatCard";
@@ -281,6 +282,18 @@ export function ConversationThread() {
             />
           </Show>
           <AgentThreadView
+            modeControl={
+              <ConversationSkillMode
+                target={
+                  props.threads?.conversation?.threadId
+                    ? { agentId: current().agent.id, threadId: props.threads.conversation.threadId }
+                    : null
+                }
+                skills={installedSkills()}
+                server={props.server}
+                runtime={props.runtime}
+              />
+            }
             scrollRef={setThreadScrollElement}
             showFullMessage={(message) =>
               threadSearchOpen() && chatSearchOpensMessage(message.body, threadSearchQuery())

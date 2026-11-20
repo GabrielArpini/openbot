@@ -23,6 +23,7 @@ import { conversationRuntime } from "./conversation-runtime";
 import { useConversationViewScope } from "./conversation-scope";
 import type { SideThread } from "./conversation-types";
 import { useThreadMarketplaceSuggestionCard } from "./MarketplaceSuggestionChatCard";
+import { ConversationSkillMode } from "./SkillModeControl";
 import { useThreadMcpSignInCard } from "./McpSignInChatCard";
 import { useMessageBackdropAction } from "./message-backdrop";
 import { useThreadSettingLinkCard } from "./SettingLinkChatCard";
@@ -200,6 +201,14 @@ export function ConversationSideThread(props: { threadId: string; resizer: JSX.E
       <Show when={shown()}>
         {(current) => (
           <AgentThreadView
+            modeControl={
+              <ConversationSkillMode
+                target={{ agentId: current().agent.id, threadId: props.threadId }}
+                skills={installedSkills()}
+                server={view.server}
+                runtime={view.runtime}
+              />
+            }
             task={current().thread.task}
             limit={view.threads?.limit ?? 1}
             agent={current().agent}

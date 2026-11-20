@@ -1,6 +1,13 @@
 import { defineMessages } from "../../../message";
 
 export const messages = defineMessages("mobile.chat", {
+  "mobile.chat.skillMode.inherit": "Use agent default",
+  "mobile.chat.skillMode.agentDefault": "Agent default",
+  "mobile.chat.skillMode.label": "Skill mode",
+  "mobile.chat.skillMode.off": "No skill mode",
+  "mobile.chat.skillMode.failed": "Could not update the skill mode.",
+  "mobile.chat.skillMode.unavailable": "This server does not support skill modes.",
+
   "mobile.chat.dictation.microphoneOffTitle": "Microphone access is off",
   "mobile.chat.dictation.microphoneOffMessage":
     "To dictate a message, allow OpenBot to use the microphone and speech recognition in Settings.",

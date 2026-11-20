@@ -1,3 +1,5 @@
+import { parseSetSkillMode, parseSkillModeTarget } from "@openbot/contracts/ipc-skill-mode";
+import { SKILL_MODES_CAPABILITY, SKILL_MODES_ROUTES } from "@openbot/contracts/team-protocol/skill-modes-v1";
 import { randomUUID } from "node:crypto";
 import { AGENT_COLORS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-colors-v1";
 import { AGENT_CREATE_OPERATION_CAPABILITY } from "@openbot/contracts/team-protocol/agent-create-operation-v1";
@@ -199,6 +201,7 @@ import {
   decodeAgentAnalyticsFromHost,
   decodeAgentModelOptions,
   decodeAgentSessionSettingsFromHost,
+  decodeSkillModeStateFromHost,
   decodeAgentSummaries,
   decodeAgentSummary,
   decodeHiddenAgentsFromHost,
@@ -662,6 +665,32 @@ export function agentIpcHandlers({
               { concurrency: "unbounded" },
             ).pipe(Effect.map(([agents]) => remoteServers.withAgentColors(serverId, agents))),
           ),
+      }),
+      readSkillMode: scopedHandler(parseSkillModeTarget, {
+        local: (input) => service.readSkillMode(input),
+        remote: (input, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, SKILL_MODES_CAPABILITY))
+            throw new Error(sourceText("error.team.agentSettingsUnsupported"));
+          return runCauseEffect(
+            remoteServers.request(serverId, SKILL_MODES_ROUTES.read, decodeSkillModeStateFromHost, {
+              method: "POST",
+              body: input,
+            }),
+          );
+        },
+      }),
+      setSkillMode: scopedHandler(parseSetSkillMode, {
+        local: (input) => runCauseEffect(service.setSkillMode(input)),
+        remote: (input, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, SKILL_MODES_CAPABILITY))
+            throw new Error(sourceText("error.team.agentSettingsUnsupported"));
+          return runCauseEffect(
+            remoteServers.request(serverId, SKILL_MODES_ROUTES.set, decodeSkillModeStateFromHost, {
+              method: "POST",
+              body: input,
+            }),
+          );
+        },
       }),
       listInstalledSkills: scopedHandler(parseAgentId, {
         local: (agentId) => runCauseEffect(skills.listInstalledForChatTags(agentId, { problems: true })),

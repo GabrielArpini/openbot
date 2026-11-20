@@ -29,7 +29,6 @@ import {
   type TeamProtocolSupportV1,
   type TeamProtocolV2AuthFrame,
   type TeamProtocolV2Json,
-  teamCapabilitiesForProtocol,
   teamCapabilityLists,
   teamProtocolV2AuthenticationTranscript,
   teamWebRtcClientProtocol,
@@ -38,6 +37,7 @@ import type { LiveVoiceEvent } from "@openbot/contracts/team-protocol/live-voice
 import { optionalTeamEvent, optionalTeamEventToCurrent } from "@openbot/contracts/team-protocol/optional-events";
 import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
 import { addSkillSuggestionNames } from "@openbot/contracts/team-protocol/skill-learning-v1";
+import { SKILL_MODES_CAPABILITY, SKILL_MODES_ROUTES } from "@openbot/contracts/team-protocol/skill-modes-v1";
 import { addUiBlockAutoAnswers } from "@openbot/contracts/team-protocol/ui-block-auto-answer-v1";
 import { addUiBlockVaultRequests } from "@openbot/contracts/team-protocol/ui-block-vault-v1";
 import {
@@ -50,6 +50,7 @@ import { errorReference, referenceFrom } from "@openbot/user-errors/reference";
 import { Context, Deferred, Effect, Exit, Layer, ManagedRuntime, Result, Schema, Scope, Semaphore } from "effect";
 import { base64ToBytes, base64UrlToBytes, bytesToBase64Url } from "./base64";
 import { createEd25519Identity, type Ed25519Identity, signEd25519, verifyEd25519Pem } from "./ed25519";
+import { skillModePeerCapabilities } from "./skill-mode-capabilities";
 
 /** `reference` is the code a user can copy, such as `signal/host_busy`. It never holds server text. */
 class RemotePeerError extends Schema.TaggedError<RemotePeerError>()("RemotePeerError", {
@@ -468,6 +469,7 @@ interface PeerState {
   localCandidates: Set<string>;
   remoteCandidates: Set<string>;
   hostProtocol: number | undefined;
+  hostCapabilities: ReadonlySet<string>;
   /** The compatibility read in flight. A request waits for it when the host protocol is not known. */
   hostProtocolRead?: Deferred.Deferred<void>;
   /** ICE restart offers sent on `connection`. See `HOST_ICE_RESTART_LIMIT`. */
@@ -1220,6 +1222,7 @@ export function createRemoteTeamPeer(
         localCandidates: new Set(),
         remoteCandidates: new Set(),
         hostProtocol: hostProtocols.get(hostId),
+        hostCapabilities: new Set(),
         iceRestarts: 0,
         iceRestartSentAt: null,
         iceRestartAt: null,
@@ -1873,7 +1876,9 @@ export function createRemoteTeamPeer(
           const body = frame.result.body;
           if (pending.method === "GET" && pending.path === TEAM_API_ROUTES.compatibility && status === 200) {
             // The highest protocol that both sides speak. A host that this client refuses keeps its maximum.
-            const host = (yield* peerDecode(() => decodeTeamProtocolSupportExpanded(body))).protocol;
+            const support = yield* peerDecode(() => decodeTeamProtocolSupportExpanded(body));
+            const host = support.protocol;
+            state.hostCapabilities = new Set(support.capabilities);
             state.hostProtocol = teamWebRtcClientProtocol(host, clientProtocol).protocol ?? host.maximum;
             hostProtocols.set(state.hostId, state.hostProtocol);
           }
@@ -2038,7 +2043,10 @@ export function createRemoteTeamPeer(
       const protocolRead = checksConnection ? Deferred.makeUnsafe<void>() : null;
       if (protocolRead) state.hostProtocolRead = protocolRead;
       // A read sent with the compatibility read must not go out with the bootstrap capabilities.
-      else if (state.hostProtocol === undefined && state.hostProtocolRead)
+      else if (
+        state.hostProtocolRead &&
+        (state.hostProtocol === undefined || path === SKILL_MODES_ROUTES.read || path === SKILL_MODES_ROUTES.set)
+      )
         yield* Deferred.await(state.hostProtocolRead);
       const delivery = upload && onUploadProgress ? trackUploadDelivery(state, onUploadProgress) : null;
       const releaseDownload =
@@ -2071,11 +2079,14 @@ export function createRemoteTeamPeer(
         // The list that this request declares to the host. The snapshot request below depends on it.
         // The first compatibility read of a connection sends the bootstrap list. A later one of protocol 10
         // sends the protocol 10 lists, so the host answers with its full set.
+        const negotiatedCapabilities = skillModePeerCapabilities(state.hostProtocol, state.hostCapabilities);
         const capabilityProtocol =
-          !checksConnection || (state.hostProtocol !== undefined && state.hostProtocol >= TEAM_PROTOCOL_V10)
+          !checksConnection ||
+          (state.hostProtocol !== undefined &&
+            (state.hostProtocol >= TEAM_PROTOCOL_V10 || negotiatedCapabilities.includes(SKILL_MODES_CAPABILITY)))
             ? state.hostProtocol
             : undefined;
-        const sentCapabilities = teamCapabilitiesForProtocol(capabilityProtocol);
+        const sentCapabilities = skillModePeerCapabilities(capabilityProtocol, state.hostCapabilities);
         const payload = yield* peerDecode(() =>
           encodeTeamProtocolV2Frame({
             version: 2,

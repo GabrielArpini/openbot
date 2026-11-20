@@ -28,13 +28,16 @@ import {
   type McpServerConfig,
 } from "@openbot/contracts/ipc";
 import { Effect } from "effect";
+import { withoutTurnContext } from "../src/backend/agent/developer-instructions";
 import type { AgentClientFactory } from "../src/backend/agent/provider-runtime";
+import { SkillModeFailed, skillModeInstructions } from "../src/backend/agent/skill-modes";
 import type { AgentBrowserHost } from "../src/backend/agent/turn-lifecycle";
 import type { AgentClient, DiagnosticOrigin } from "../src/backend/agent-client";
 import type { ClaudeCliInfo } from "../src/backend/cli";
 import type { AppServerNotification, AppServerRequest, RequestId, ResponseDecoder } from "../src/backend/protocol";
 import { providerSync } from "../src/backend/provider-client-effects";
 import type { ReadProviderHistory } from "../src/backend/provider-history";
+import { checkRetentionOracleNegativeControls, checkSkillModeRetention, requireRetentionPhases, type RetentionReceipt, type RetentionPhase } from "./skill-mode-retention-oracle";
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/provider-session-reuse-e2e");
 const root = await mkdtemp(join(tmpdir(), "openbot-session-reuse-"));
@@ -158,7 +161,7 @@ process.stdout.on("error", (error) => {
 const write = (message) => process.stdout.write(JSON.stringify(message) + "\\n");
 const answer = (message) => {
   const params = message.params || {};
-  log({ method: message.method, threadId: params.threadId ?? null });
+  log({ method: message.method, threadId: params.threadId ?? null, params: { threadId: params.threadId, input: params.input, developerInstructions: params.developerInstructions } });
   switch (message.method) {
     case "initialize": return write({ id: message.id, result: {} });
     case "account/read": return write({ id: message.id, result: { account: { type: "chatgpt", email: "codex@example.com" } } });
@@ -269,6 +272,7 @@ interface ClientEvents {
  */
 class ClaudeStandIn extends EventEmitter<ClientEvents> implements AgentClient {
   readonly provider = "claude";
+  readonly turnContext = true;
   readonly contextCompaction = "native";
   readonly #real: InstanceType<typeof ClaudeAgentClient>;
   readonly readHistory: ReadProviderHistory;
@@ -351,6 +355,9 @@ interface CaseDetails {
   afterRotation?: { sessionId: string; repeatsFirstRequest: boolean };
   channelPromptCount?: number;
   tasks?: string[];
+  skillModeChecks?: string[];
+  retentionReceipts?: RetentionReceipt[];
+  retentionNegativeControls?: string[];
   groupChildren?: { pid: number; endedWithProvider: boolean }[];
 }
 
@@ -416,6 +423,7 @@ interface Profile {
   store: Store;
   mailbox: Mailbox;
   sqlite: () => DatabaseSync;
+  reviseMode: () => void;
 }
 
 /** Runs one case on its own temporary profile and service, where only `provider` is on. */
@@ -430,10 +438,34 @@ async function runCase(
   const database = new OpenBotDatabase(join(root, `user-data-${name}`));
   const store = new AgentStore(database.userDataPath, home, database);
   const mailbox = new MailboxStore(database.userDataPath, store.sharedRoot, store.database);
+  let modeRevision = 1;
+  const boundaryBody = (skillId: string, extra: number) => {
+    const wrapper = skillModeInstructions({
+      selection: { skillId, name: skillId, revision: modeRevision, sha256: "0".repeat(64) },
+      text: "",
+    });
+    return "x".repeat(32_000 - wrapper.length + extra);
+  };
   const agents = new AgentService({
     store,
     mailbox,
     browser,
+    skillModeSource: (_agentId, skillId) =>
+      skillId === "missing"
+        ? Effect.fail(new SkillModeFailed({ cause: new Error("Fixture skill missing") }))
+        : Effect.succeed({
+            skillId,
+            name: skillId === "retention-fixture" ? "Retention fixture" : skillId,
+            revision: skillId === "retention-fixture" ? 1 : modeRevision,
+            text:
+              skillId === "retention-fixture"
+                ? "Synthetic skill retention fixture.\nKeep the complete body through every observed request.\nUnicode sentinel: Ω.\nTail sentinel: RETENTION_END_2947."
+                : skillId === "oversize"
+                ? "x".repeat(32001)
+                : skillId === "exact-limit" || skillId === "wrapper-overflow"
+                  ? boundaryBody(skillId, skillId === "wrapper-overflow" ? 1 : 0)
+                  : `MODE_BODY_${skillId}_COMPLETE_REVISION_${modeRevision}`,
+          }),
     preferredProvider: provider,
     offProviders: AGENT_PROVIDERS.filter((candidate) => candidate !== provider),
     timezone: () => "UTC",
@@ -447,7 +479,18 @@ async function runCase(
   const closeReader = () => connection?.close();
   try {
     await runCauseEffect(agents.initialize());
-    await run({ agents, store, mailbox, sqlite }, result.details);
+    await run(
+      {
+        agents,
+        store,
+        mailbox,
+        sqlite,
+        reviseMode: () => {
+          modeRevision++;
+        },
+      },
+      result.details,
+    );
     result.passed = true;
   } catch (error) {
     result.error = error instanceof Error ? (error.stack ?? error.message) : String(error);
@@ -776,7 +819,149 @@ try {
   const stopService = (profile: Profile) => runCauseEffect(profile.agents.stop());
   await runGroupCase("codex-stop-ends-process-group", "codex", stopService);
 
-  report.passed = report.cases.length === 5 && report.cases.every((entry) => entry.passed);
+  for (const provider of ["claude", "codex"] as const) {
+    await runCase(
+      `${provider}-persistent-skill-mode`,
+      provider,
+      async (profile, details) => {
+        const { agents, store } = profile;
+        const agent = await createAgent(
+          agents,
+          `Mode ${provider}`,
+          provider,
+          provider === "claude" ? CLAUDE_MODEL : undefined,
+        );
+        const threadId = store.list().find((entry) => entry.id === agent.id)?.threadId;
+        assert.ok(threadId);
+        const target = { agentId: agent.id, threadId };
+        const prompts = () =>
+          provider === "claude"
+            ? entries<{ text: string; sessionId: string }>(claudeMessages).map((entry) => ({
+                text: entry.text,
+                sessionId: entry.sessionId,
+              }))
+            : entries<{ method: string; params?: { threadId?: string; input?: { type: string; text?: string }[] } }>(
+                codexLog,
+              )
+                .filter((entry) => entry.method === "turn/start")
+                .map((entry) => ({
+                  text: entry.params?.input?.map((part) => part.text ?? "").join("\n") ?? "",
+                  sessionId: entry.params?.threadId,
+                }));
+        const selected = await runCauseEffect(agents.setSkillMode({ ...target, skillId: "first", scope: "agent" }));
+        assert.equal(selected.selection?.revision, 1);
+        assert.equal(selected.inherited, true);
+        assert.equal(selected.agentDefault?.skillId, "first");
+        await sendTurn(profile, agent.id, "mode-initial");
+        const initial = prompts().at(-1);
+        assert.ok(initial);
+        assert.ok(initial.text.includes("MODE_BODY_first_COMPLETE"));
+        assert.ok(
+          !withoutTurnContext(initial.text).includes("MODE_BODY_first_COMPLETE"),
+          "history excludes injected mode",
+        );
+        await sendTurn(profile, agent.id, "mode-later");
+        assert.equal(prompts().at(-1)?.sessionId, initial.sessionId);
+        assert.ok(prompts().at(-1)?.text.includes("MODE_BODY_first_COMPLETE"));
+        await runCauseEffect(agents.refreshAllAgentRuntimes());
+        await sendTurn(profile, agent.id, "mode-reconstructed");
+        assert.ok(prompts().at(-1)?.text.includes("MODE_BODY_first_COMPLETE"));
+        assert.equal(agents.readSkillMode(target).selection?.sha256, selected.selection?.sha256);
+        profile.reviseMode();
+        await assert.rejects(
+          runCauseEffect(agents.skillModes.resolve(target)),
+          "revision change requires explicit re-selection",
+        );
+        await runCauseEffect(agents.setSkillMode({ ...target, skillId: "first" }));
+        await sendTurn(profile, agent.id, "mode-revised");
+        assert.ok(prompts().at(-1)?.text.includes("REVISION_2"));
+        await assert.rejects(
+          runCauseEffect(agents.setSkillMode({ ...target, agentId: "other-agent", skillId: "first" })),
+        );
+        await assert.rejects(runCauseEffect(agents.setSkillMode({ ...target, skillId: "oversize" })));
+        await assert.rejects(runCauseEffect(agents.setSkillMode({ ...target, skillId: "wrapper-overflow" })));
+        await assert.rejects(runCauseEffect(agents.setSkillMode({ ...target, skillId: "missing" })));
+        assert.equal(agents.readSkillMode(target).selection?.skillId, "first");
+        await runCauseEffect(agents.setSkillMode({ ...target, skillId: "exact-limit" }));
+        await sendTurn(profile, agent.id, "mode-exact-limit");
+        const exactPrompt = prompts().at(-1)?.text ?? "";
+        const exactBlock = exactPrompt.match(/<openbot_skill_mode>[\s\S]*?<\/openbot_skill_mode>/u)?.[0];
+        assert.equal(exactBlock?.length, 32_000, "the full provider mode block fits the exact limit");
+        await runCauseEffect(agents.setSkillMode({ ...target, skillId: "second" }));
+        await sendTurn(profile, agent.id, "mode-switched");
+        const switched = prompts().at(-1);
+        assert.notEqual(switched?.sessionId, initial.sessionId);
+        assert.ok(switched?.text.includes("MODE_BODY_second_COMPLETE"));
+        await runCauseEffect(agents.setSkillMode({ ...target, skillId: null }));
+        await sendTurn(profile, agent.id, "mode-removed");
+        assert.notEqual(prompts().at(-1)?.sessionId, switched?.sessionId);
+        assert.ok(prompts().at(-1)?.text.includes("No skill mode is selected"));
+        assert.equal(agents.readSkillMode(target).selection, null);
+        assert.equal(agents.readSkillMode(target).inherited, false, "off overrides an agent default");
+        await runCauseEffect(agents.refreshAllAgentRuntimes());
+        assert.equal(await runCauseEffect(agents.skillModes.resolve(target)), null, "off survives reconstruction");
+        await runCauseEffect(agents.setSkillMode({ ...target, skillId: "first", scope: "agent" }));
+        assert.equal(agents.readSkillMode(target).selection, null, "changing a default preserves explicit off");
+        await runCauseEffect(agents.setSkillMode({ ...target, skillId: null, scope: "inherit" }));
+        await sendTurn(profile, agent.id, "mode-default-restored");
+        assert.ok(prompts().at(-1)?.text.includes("MODE_BODY_first_COMPLETE_REVISION_2"));
+        assert.equal(agents.readSkillMode(target).inherited, true);
+        await runCauseEffect(agents.setSkillMode({ ...target, skillId: null, scope: "agent" }));
+        await sendTurn(profile, agent.id, "mode-default-cleared");
+        assert.ok(prompts().at(-1)?.text.includes("No skill mode is selected"));
+        await runCauseEffect(agents.setSkillMode({ ...target, skillId: "first", scope: "agent" }));
+        details.retentionNegativeControls = checkRetentionOracleNegativeControls();
+        const receipts: RetentionReceipt[] = [];
+        const captureRetention = (phase: RetentionPhase, expectation: "selected" | "off") => {
+          const observed = prompts();
+          const request = observed.at(-1);
+          assert.ok(request?.sessionId, "actual adapter request identifies its session");
+          receipts.push(checkSkillModeRetention({
+            observation: { phase, sessionId: request.sessionId, requestSequence: observed.length,
+              source: { kind: "outbound-request", text: request.text } }, expectation,
+          }));
+        };
+        await runCauseEffect(agents.setSkillMode({ ...target, skillId: "retention-fixture" }));
+        await sendTurn(profile, agent.id, "retention-initial");
+        captureRetention("initial", "selected");
+        await sendTurn(profile, agent.id, "retention-ordinary");
+        captureRetention("ordinary", "selected");
+        await runCauseEffect(agents.refreshAllAgentRuntimes());
+        await sendTurn(profile, agent.id, "retention-reconstructed");
+        captureRetention("reconstructed", "selected");
+        await runCauseEffect(agents.setSkillMode({ ...target, skillId: null }));
+        await sendTurn(profile, agent.id, "retention-off");
+        captureRetention("off", "off");
+        requireRetentionPhases({ receipts, phases: ["initial", "ordinary", "reconstructed", "off"] });
+        details.retentionReceipts = receipts;
+        await runCauseEffect(agents.deleteAgent(agent.id));
+        assert.deepEqual(
+          profile.sqlite().prepare("SELECT agent_id FROM agent_skill_mode_defaults WHERE agent_id = ?").all(agent.id),
+          [],
+          "forgetting an agent removes its default without depending on roster foreign keys",
+        );
+        details.skillModeChecks = [
+          "initial body",
+          "later full body",
+          "resume reconstruction",
+          "persisted hash",
+          "oversize refused without truncation",
+          "wrapper overflow refused before selection changes",
+          "exact 32000-character block delivered",
+          "missing refused",
+          "switch replaces session",
+          "disable replaces session",
+          "agent default is inherited and reconstructed",
+          "explicit off survives default changes",
+          "restore inheritance and clear default",
+          "agent deletion removes its default",
+        ];
+      },
+      provider === "claude" ? (_provider, cli) => new ClaudeStandIn(cli) : undefined,
+    );
+  }
+
+  report.passed = report.cases.length === 7 && report.cases.every((entry) => entry.passed);
 } finally {
   mkdirSync(OUT, { recursive: true });
   writeFileSync(join(OUT, "report.json"), `${JSON.stringify(report, null, 2)}\n`);

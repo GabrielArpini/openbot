@@ -1,3 +1,4 @@
+import { isSkillModeState, type SkillModeState } from "@openbot/contracts/ipc-skill-mode";
 import {
   type AgentNotificationLevelsSnapshot,
   type AgentSessionSettings,
@@ -270,5 +271,10 @@ export function decodeSidebarPinsFromMain(value: unknown): SidebarPinsSnapshot {
 
 export function decodeAgentNotificationLevelsFromMain(value: unknown): AgentNotificationLevelsSnapshot {
   if (!isAgentNotificationLevelsSnapshot(value)) throw new Error("Invalid agent notification levels response.");
+  return value;
+}
+
+export function decodeSkillModeStateFromMain(value: unknown): SkillModeState {
+  if (!isSkillModeState(value)) throw new Error("Invalid skill mode state response.");
   return value;
 }

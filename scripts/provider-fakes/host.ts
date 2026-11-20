@@ -47,6 +47,7 @@ export interface ThreadStartParams {
   model?: string;
   runtimeWorkspaceRoots?: string[];
   developerInstructions?: string;
+  skillModeInstructions?: string;
   memoryContext?: MemoryContext;
 }
 

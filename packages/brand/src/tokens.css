@@ -29,6 +29,16 @@
   --openbot-border-chrome-glass: rgba(255, 255, 255, 0.08);
 
   /* Neutral color system. Keep UI colors here, not in components. */
+  --openbot-skill-mode-border: #33353f;
+  --openbot-skill-mode-muted: #a4a6b1;
+  --openbot-skill-mode-selected-surface: #2b2550;
+  --openbot-skill-mode-selected-border: #5b4bd1;
+  --openbot-skill-mode-selected-text: #d8d2ff;
+  --openbot-skill-mode-reveal-surface: #2f3140;
+  --openbot-skill-mode-reveal-border: #474a5a;
+  --openbot-skill-mode-reveal-text: #f0f0f3;
+  --openbot-skill-mode-reveal-shadow: #000a;
+
   --openbot-bg-canvas: #1a1a1a;
   /* The window frame around the page card, darker than the card, so the card comes forward. */
   --openbot-bg-frame: #0d0d0d;

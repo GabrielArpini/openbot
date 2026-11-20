@@ -550,6 +550,7 @@ export interface TeamApiAdmin {
   folders?: Omit<AgentFolders, "requireAgent">;
   /** `agent-instructions-v1`: read and save the instruction file of one agent. */
   instructions?: Pick<AgentInstructionsFiles, "listAgents" | "read" | "save">;
+  skillModes?: Pick<AgentService, "readSkillMode" | "setSkillMode">;
   sessionSettings?: Pick<
     AgentService,
     "readAgentSessionSettings" | "setAgentSessionSetting" | "resetAgentSessionSetting"

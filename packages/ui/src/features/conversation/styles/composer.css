@@ -583,6 +583,172 @@
   gap: 8px;
 }
 
+.composer:has(.composer-skill-mode) {
+  container: skill-composer / inline-size;
+}
+
+.composer-skill-mode {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 172px;
+  margin-inline-end: auto;
+  border: 1px solid var(--openbot-skill-mode-border);
+  border-radius: 999px;
+  padding: 3px 10px;
+  color: var(--openbot-skill-mode-muted);
+  font:
+    400 12px / normal system-ui,
+    sans-serif;
+  white-space: nowrap;
+}
+
+.composer-skill-mode[data-selected] {
+  background: var(--openbot-skill-mode-selected-surface);
+  border-color: var(--openbot-skill-mode-selected-border);
+  color: var(--openbot-skill-mode-selected-text);
+}
+
+.composer-skill-mode-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  white-space: inherit;
+  cursor: pointer;
+}
+
+.composer-skill-mode-trigger:focus-visible,
+.composer-skill-mode-clear:focus-visible {
+  outline: 2px solid var(--openbot-border-focus);
+  outline-offset: 2px;
+}
+
+.composer-skill-mode-trigger > :first-child {
+  flex: none;
+}
+
+.composer-skill-mode-trigger svg {
+  width: 12px;
+  height: 12px;
+}
+
+.composer-skill-mode .composer-skill-mode-clear {
+  flex: none;
+  width: auto;
+  min-width: 0;
+  height: auto;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  opacity: 0.7;
+}
+
+.composer-skill-mode-clear:hover {
+  opacity: 1;
+}
+
+.composer-skill-mode-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.composer-skill-mode-menu {
+  max-width: min(320px, calc(100vw - var(--openbot-space-6)));
+}
+
+.composer-skill-mode-tooltip {
+  z-index: var(--openbot-layer-tooltip);
+  pointer-events: none;
+  box-sizing: content-box;
+  width: max-content;
+  max-width: min(280px, calc(100vw - 44px));
+  border: 1px solid var(--openbot-skill-mode-reveal-border);
+  border-radius: 8px;
+  background: var(--openbot-skill-mode-reveal-surface);
+  padding: 6px 9px;
+  color: var(--openbot-skill-mode-reveal-text);
+  font:
+    400 12px / normal system-ui,
+    sans-serif;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  box-shadow: 0 8px 24px var(--openbot-skill-mode-reveal-shadow);
+}
+
+.composer-skill-mode-tooltip small {
+  display: block;
+  margin-top: 2px;
+  color: var(--openbot-skill-mode-muted);
+  font-size: smaller;
+}
+
+@container skill-composer (max-width: 300px) {
+  .composer-skill-mode {
+    max-width: 142px;
+  }
+}
+
+.composer-skill-mode-menu.ui-action-menu:not([data-menu-layout="grid"]) [role="menuitemradio"] {
+  height: auto;
+}
+
+.composer-skill-mode-summary {
+  display: grid;
+  gap: var(--openbot-space-1);
+  padding: var(--openbot-space-2);
+}
+
+.composer-skill-mode-name {
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.composer-skill-mode-check {
+  display: inline-flex;
+  width: var(--openbot-space-4);
+  flex: none;
+}
+
+.composer[data-compact]:has(.composer-toolbar > .composer-skill-mode) {
+  grid-template-columns: 28px auto minmax(0, 1fr) auto;
+}
+
+.composer[data-compact] .composer-toolbar > .composer-skill-mode {
+  grid-column: 2;
+  grid-row: 1;
+  width: fit-content;
+  justify-self: start;
+}
+
+.composer[data-compact]:has(.composer-toolbar > .composer-skill-mode) .composer-input-label {
+  grid-column: 3;
+}
+
+.composer[data-compact]:has(.composer-toolbar > .composer-skill-mode) .composer-editor-placeholder {
+  inset-inline-end: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.composer[data-compact]:has(.composer-toolbar > .composer-skill-mode) .composer-toolbar > .composer-primary-actions {
+  grid-column: 4;
+}
+
 .composer[data-compact] .composer-input-label {
   grid-column: 2;
   grid-row: 1;

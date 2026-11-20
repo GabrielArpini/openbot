@@ -88,6 +88,7 @@ export interface AgentTurnCompletedEvent {
 }
 
 export type AgentEvent =
+  | { type: "skill-mode-changed"; agentId: string; threadId: string }
   | { type: "channels-changed"; channelId: string; revision: number }
   | { type: "status"; status: AgentStatus }
   | { type: "usage-changed"; usage: AccountUsage }
@@ -299,6 +300,8 @@ export function isAgentEvent(value: unknown): value is AgentEvent {
       return isString(value.agentId) && value.agentId.length > 0 && value.agentId.length <= INPUT_LIMITS.identifier;
     case "routines-changed":
       return isString(value.agentId) && value.agentId.length > 0 && value.agentId.length <= INPUT_LIMITS.identifier;
+    case "skill-mode-changed":
+      return isIdentifier(value.agentId) && isIdentifier(value.threadId);
     case "agent-session-settings-changed":
     case "message-pins-changed":
     case "skills-changed":

@@ -102,6 +102,22 @@ export function syncEventQueries(
   ) {
     void queryClient.invalidateQueries({ queryKey: queryKeys.agentInfo(scope, serverId, event.agentId) });
   }
+  if (event.type === "skills-changed") {
+    void queryClient.invalidateQueries({
+      predicate: (query) =>
+        query.queryKey.at(-1) === "mode-skill-options" &&
+        query.queryKey.includes(serverId) &&
+        query.queryKey.includes(event.agentId),
+    });
+  }
+  if (event.type === "skill-mode-changed") {
+    void queryClient.invalidateQueries({
+      predicate: (query) =>
+        query.queryKey.at(-1) === "skill-mode" &&
+        query.queryKey.includes(serverId) &&
+        query.queryKey.includes(event.threadId),
+    });
+  }
   if (event.type === "agent-session-settings-changed") {
     void queryClient.invalidateQueries({
       queryKey: queryKeys.agentInfo(scope, serverId, event.agentId),

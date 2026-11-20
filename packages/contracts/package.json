@@ -4,6 +4,8 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./team-protocol/skill-modes-v1": "./src/team-protocol/skill-modes-v1.ts",
+    "./ipc-skill-mode": "./src/ipc-skill-mode.ts",
     "./live-activity-relay": "./src/live-activity-relay.ts",
     "./notification-relay": "./src/notification-relay.ts",
     "./agent-mention-rank": "./src/agent-mention-rank.ts",

@@ -164,6 +164,7 @@ export interface AgentThreadQueue {
 }
 
 export interface AgentThreadViewProps {
+  modeControl?: JSX.Element;
   /** Null for a new thread: its first message starts it. */
   task: AgentTask | null;
   /** How many threads of the agent can run at the same time. */
@@ -1249,6 +1250,7 @@ export function AgentThreadView(props: AgentThreadViewProps) {
               onPickSkill={() => setSkillPickerRequest((current) => current + 1)}
               onSideQuestion={props.onSideQuestion}
             />
+            {props.modeControl}
             <div class="composer-primary-actions">
               {/* One meter for each thread: a pending Compact or an open popover stays with its thread. */}
               <Show when={props.task?.id} keyed>

@@ -477,6 +477,7 @@ export const SELF_WAKE_NOTE = [
  */
 export function isTurnContextBlock(text: string): boolean {
   return [
+    "<openbot_skill_mode>",
     MEMORY_BLOCK_START,
     MEMORY_UPDATE_START,
     TEAMMATES_BLOCK_START,
@@ -496,7 +497,7 @@ export function isTurnContextBlock(text: string): boolean {
  */
 export function withoutTurnContext(text: string): string {
   return text.replace(
-    /^(?:<(openbot_saved_memories|openbot_saved_memories_update|openbot_section_teammates|openbot_agent_instructions|openbot_saved_logins|openbot_turn_style|openbot_steer|openbot_background_wake)>\n[\s\S]*?\n<\/\1>\n*)+/u,
+    /^(?:<(openbot_skill_mode|openbot_saved_memories|openbot_saved_memories_update|openbot_section_teammates|openbot_agent_instructions|openbot_saved_logins|openbot_turn_style|openbot_steer|openbot_background_wake)>\n[\s\S]*?\n<\/\1>\n*)+/u,
     "",
   );
 }

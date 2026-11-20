@@ -1,3 +1,4 @@
+import { isSkillModeState, type SkillModeState } from "@openbot/contracts/ipc-skill-mode";
 import {
   type AgentSessionSettings,
   decodeAgentAnalytics,
@@ -337,5 +338,10 @@ export function decodeHostAnalyticsFromHost(value: unknown) {
 
 export function decodeAgentSessionSettingsFromHost(value: unknown): AgentSessionSettings {
   if (!isAgentSessionSettings(value)) throw new Error("Invalid session settings response.");
+  return value;
+}
+
+export function decodeSkillModeStateFromHost(value: unknown): SkillModeState {
+  if (!isSkillModeState(value)) throw new Error("Invalid skill mode state response.");
   return value;
 }

@@ -1,6 +1,16 @@
 import { defineMessages } from "../../message";
 
 export const messages = defineMessages("skill", {
+  "skill.mode.inherited": "Agent default",
+  "skill.mode.inherit": "Use agent default",
+  "skill.mode.makeDefault": "Set as agent default",
+  "skill.mode.clearDefault": "Clear agent default",
+  "skill.mode.label": "Skill mode",
+  "skill.mode.chatHint": "Skill mode for this chat",
+  "skill.mode.tapHint": "Skill mode · tap again to change",
+  "skill.mode.off": "No skill mode",
+  "skill.mode.help": "The full skill text is included in this chat. Changes apply from the next turn.",
+  "skill.mode.failed": "Could not update the skill mode.",
   "skill.title": "Skills",
   "skill.close": "Close skills",
   "skill.detailsDescription": "{name} details",

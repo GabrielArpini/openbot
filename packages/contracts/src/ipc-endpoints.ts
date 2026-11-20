@@ -11,6 +11,7 @@ import type {
   SetAgentSessionSettingInput,
 } from "./ipc-agent-session-settings";
 import type { ServerAuditLog } from "./ipc-server-audit";
+import type { SetSkillModeInput, SkillModeState, SkillModeTarget } from "./ipc-skill-mode";
 import type { AgentActiveQueues } from "./team-protocol/agent-active-queues-v1";
 // The one channel list. Each endpoint holds its wire value, the group it belongs to, and whether it
 // is a request the renderer invokes or an event the main process sends. That is what lets a
@@ -1799,6 +1800,8 @@ export const IPC_ENDPOINTS = {
     getUsage: scopedRequest<string | undefined, AccountUsage>()("agent:get-usage"),
     listModels: scopedQuery<ClientAgentModelOption[]>()("agent:list-models"),
     listAgents: scopedQuery<ClientAgentSummary[]>()("agent:list"),
+    readSkillMode: scopedRequest<SkillModeTarget, SkillModeState>()("agent:skill-mode:read"),
+    setSkillMode: scopedRequest<SetSkillModeInput, SkillModeState>()("agent:skill-mode:set"),
     readAgentSessionSettings: scopedRequest<string, AgentSessionSettings>()("agent:session-settings:read"),
     setAgentSessionSetting: scopedRequest<SetAgentSessionSettingInput, AgentSessionSettings>()(
       "agent:session-settings:set",
