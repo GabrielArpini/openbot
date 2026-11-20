@@ -35,6 +35,7 @@ function repairForkMessagingHistory(db: DatabaseSync): void {
   if (db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='projection_messaging_history'").get()) return;
   const forkTables = [...THREAD_SKILL_MODES_SCHEMA_SQL.matchAll(/CREATE TABLE IF NOT EXISTS (\w+) ([\s\S]*?);/g)];
   const matchesFork = forkTables.length === 3 && forkTables.every(([statement, name]) => {
+    if (!statement || !name) return false;
     const row = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name=?").get(name);
     return typeof row?.sql === "string" && canonicalSql(row.sql) === canonicalSql(statement);
   });

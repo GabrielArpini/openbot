@@ -14,7 +14,6 @@ import { join } from "node:path";
 import type { AgentSummary } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Result } from "effect";
-import { zipSync } from "fflate";
 import { CentralAuthManager } from "../src/main/central-auth-manager";
 import { LocalSkillLibrary } from "../src/main/local-skill-library";
 import { localSkillTools } from "../src/main/local-skill-tools";
