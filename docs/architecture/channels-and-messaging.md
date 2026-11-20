@@ -388,7 +388,9 @@ stopping. Webhook routines still need the agent's own chat.
 Channel work holds only the agent that does it. Each channel has its own mailbox lane
 (`channelLane(channelId)`, from `StoredMessage.channelId`), and its execution thread is a side thread
 in `ConversationRuntime`. So a channel turn runs beside the agent's own chat and its messaging
-deliveries, as a task turn does (#4761). It gets the side-thread guidance and no Computer Use. An
+deliveries, as a task turn does (#4761). It gets the side-thread guidance. It keeps Computer Use
+when the agent has it on, so a channel task can drive a desktop app without a step in the own chat.
+The channel turn and the own chat can then drive the screen at the same time, as two agents can. An
 agent runs one channel turn at a time over all channels: the scheduler holds the other channel lanes
 (`channel-turn`), and the channel `busy` hook starts no second assignment while one is active. The
 work of other agents does not hold it. A channel turn takes no task slot. When the provider of the
@@ -894,8 +896,11 @@ is one linked number (`workspace_id` is the number in digits).
   and its copy, and an edit changes the text, only when the sender is the saved `author_id`: the sender
   chooses the message id. A group admin's delete of another person's message is not followed. `MessagingService` deletes the rows and copies older than 90 days at start and
   each hour, also those of a number that is off; a disconnect deletes all of them for the connection.
-- **Not on joined servers.** `connectors-v1` and `routine-results-v1` stay as released: a host leaves
-  WhatsApp out of both, and the desktop IPC endpoints `messaging:*-whatsapp-*` are local only.
+- **Joined servers.** `connectors-v1` and `routine-results-v1` stay as released: a host leaves
+  WhatsApp out of both, and the desktop IPC endpoints `messaging:*-whatsapp-*` are local only. A client
+  that sends `routine-results-whatsapp-v1` also gets the WhatsApp numbers in the routine-results
+  options, so a routine or a workflow on a joined server can send to WhatsApp. A client without it
+  gets `destination: null` for a WhatsApp destination.
 
 ## Mobile chat queue
 

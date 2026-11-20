@@ -14,6 +14,7 @@ import { join } from "node:path";
 import type { AgentSummary } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Result } from "effect";
+import { zipSync } from "fflate";
 import { CentralAuthManager } from "../src/main/central-auth-manager";
 import { LocalSkillLibrary } from "../src/main/local-skill-library";
 import { localSkillTools } from "../src/main/local-skill-tools";
@@ -36,7 +37,6 @@ function skillMarkdown(description: string, body: string): string {
   return `---\nname: Demo Skill\ndescription: ${description}\n---\n\n${body}\n`;
 }
 
-/** The message of a failed Effect, or null when it succeeded. */
 async function failure<A, E extends { cause: unknown }>(effect: Effect.Effect<A, E>): Promise<string | null> {
   const result = await Effect.runPromise(Effect.result(effect));
   if (Result.isSuccess(result)) return null;
@@ -85,7 +85,6 @@ async function scenario(name: string, run: (context: Context) => Promise<Record<
     };
     const agents = () => [agent];
     const library = new LocalSkillLibrary(join(root, "library"), agents);
-    // A local skill never reaches the account service, so this one has no session.
     const auth = new CentralAuthManager({
       apiUrl: "https://example.invalid",
       storagePath: join(root, "auth.json"),

@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/team";
 
 export const messages = {
-  // Errors that the Team API and the team store send to clients.
   "error.team.ownerNotLinked": "このホストは OpenBot のオーナーアカウントにリンクされていません。",
   "error.team.ownerEmailRequired": "このホストを作成した OpenBot のメールアドレスでサインインしてください。",
   "error.team.hostNotConfigured": "チームのホストが設定されていません。",
@@ -124,6 +123,7 @@ export const messages = {
   "error.team.hostUpdateUnsupported": "この接続ではホストをアップデートできません。",
   "error.team.hostTimezoneUnsupported": "この接続はサーバーのタイムゾーンに対応していません。",
   "error.team.hostRestartUnsupported": "この接続はサーバーの再起動に対応していません。",
+  "error.team.ownerTransferUnsupported": "このサーバーは所有権の移転に対応していません。",
   "error.team.hostKeyRotationUnsupported": "この接続はサーバーキーの変更に対応していません。",
   "error.team.localServersUnsupported": "この接続はこのコンピュータ上のサーバーに対応していません。",
   "error.team.routineResultsUnsupported": "この接続はルーティンの送信先に対応していません。",
@@ -191,6 +191,7 @@ export const messages = {
   "error.team.hostPersonalityUnsupported": "この接続はサーバーのパーソナリティに対応していません。",
   "error.team.agentWaitsUnsupported": "この接続では未完了の待機を使用できません。",
   "error.team.pendingApprovalUnsupported": "この接続では承認リクエスト全体を読み込めません。",
+  "error.team.pendingPromptsUnsupported": "この接続では未回答の質問を読み込めません。",
   "error.team.phoneFeedbackUnsupported": "この接続ではスマートフォンアプリからレポートを送信できません。",
   "error.team.messagePinsUnsupported": "この接続はピン留めしたメッセージに対応していません。",
   "error.team.queuedMessageThreadUnsupported":
